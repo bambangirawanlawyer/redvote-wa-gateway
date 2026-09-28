@@ -1,0 +1,29 @@
+{
+  "name": "redvote-wa-gateway",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Private WhatsApp transport gateway for REDVOTE applications",
+  "engines": { "node": ">=20.0.0" },
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "start": "node dist/server.js",
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --import tsx --test tests/**/*.test.ts"
+  },
+  "dependencies": {
+    "@hapi/boom": "^10.0.1",
+    "baileys": "7.0.0-rc.9",
+    "dotenv": "^17.2.2",
+    "fastify": "^5.6.0",
+    "pg": "^8.16.3",
+    "pino": "^9.9.4"
+  },
+  "devDependencies": {
+    "@types/node": "^24.5.2",
+    "@types/pg": "^8.15.5",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.2"
+  }
+}
