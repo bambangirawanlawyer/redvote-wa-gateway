@@ -1,24 +1,23 @@
 # REDHUB WA Gateway — Checkpoints
 
-> Checkpoint log untuk proyek RedHub WA Gateway. Dokumen ini terpisah dari CHECKPOINTS.md REDVOTE WA Gateway lama.
+> Source of truth checkpoint RedHub WA Gateway. Terpisah dari checkpoint REDVOTE lama.
 
 ## Status Convention
 
-- **NEXT** — tahap berikut yang harus dikerjakan.
-- **IN PROGRESS** — sedang dikerjakan, belum boleh dianggap selesai.
-- **PASS** — acceptance criteria sudah diuji.
-- **PASS / LOCKED** — lulus dan keputusan/hasil dikunci.
-- **BLOCKED** — ada blocker nyata yang harus diselesaikan.
+- **NEXT** — tahap berikut.
+- **IN PROGRESS** — sedang dikerjakan.
+- **PASS** — acceptance criteria telah diuji.
+- **PASS / LOCKED** — lulus dan dikunci.
+- **BLOCKED** — ada blocker nyata.
 - **FAILED** — acceptance criteria gagal.
+- **SUPERSEDED** — rencana lama digantikan oleh keputusan eksplisit yang lebih baru.
 
-Setiap PASS harus mencatat:
+Setiap checkpoint yang PASS wajib mencatat:
 - tanggal;
 - branch;
 - commit SHA;
-- file utama yang berubah;
-- hasil build/test;
-- bukti endpoint/behavior;
-- migration bila ada;
+- perubahan utama;
+- hasil build/test/runtime;
 - deployment state;
 - rollback note;
 - next checkpoint.
@@ -26,43 +25,20 @@ Setiap PASS harus mencatat:
 ---
 
 ## WA-000 — Architecture & Contract
-**Status: PASS / LOCKED**  
+**Status: PASS / LOCKED (historical baseline)**  
 **Date:** 2026-10-04
 
-### Locked
-- Tujuan: gateway mandiri agar RedHub tidak bergantung pada Fonnte.
-- Gateway dibangun sebagai service terpisah dari backend utama RedHub.
-- Integrasi RedHub ditunda sampai gateway selesai.
-- Local-first menggunakan Docker.
-- Node.js + TypeScript + Fastify.
-- PostgreSQL untuk persistence dan queue.
-- Baileys sebagai provider adapter V1.
-- Provider abstraction wajib agar future Meta Cloud API dapat ditambahkan tanpa membongkar RedHub.
-- Outbound only.
-- Pilot 1 nomor WhatsApp Jember.
-- Message invitation terpersonalisasi.
-- PDF resmi dikirim sebagai document attachment.
-- Persistent WhatsApp session.
-- Retry terbatas.
-- Idempotency / anti duplicate.
-- Delivery log.
-- Multi-tenant ready.
-- Default future architecture: 1 tenant/kabupaten = 1 nomor WA.
-- Future: satu tenant dapat memiliki lebih dari satu device.
-- No Redis pada V1.
-- No Chromium/Puppeteer pada baseline.
-- No inbox/chatbot/CRM/marketing blast pada V1.
-- Production target VPS: 202.10.36.74.
-- Production deployment hanya setelah local validation selesai.
+Baseline awal:
+- service terpisah dari RedHub;
+- local-first Docker;
+- Node.js + TypeScript + Fastify;
+- Baileys provider adapter;
+- persistent session;
+- PDF attachment;
+- multi-tenant direction;
+- production target VPS `202.10.36.74`.
 
-### Documentation
-- `docs/REDHUB_WA_GATEWAY_MASTER_HANDOFF.md`
-- `docs/REDHUB_WA_GATEWAY_CHECKPOINTS.md`
-- `docs/REDHUB_WA_GATEWAY_DECISIONS.md`
-- `docs/REDHUB_WA_GATEWAY_API_CONTRACT.md`
-
-### Acceptance Result
-PASS — architecture, scope, message/PDF requirement, multi-tenant direction, local-first workflow, provider abstraction, and deployment sequence telah disepakati.
+Catatan: bagian queue/campaign/retry-business dari baseline awal kemudian **disederhanakan secara eksplisit** pada WA-001A.
 
 ---
 
@@ -70,51 +46,104 @@ PASS — architecture, scope, message/PDF requirement, multi-tenant direction, l
 **Status: PASS / LOCKED**  
 **Date:** 2026-10-04  
 **Branch:** `feat/redhub-wa-001-foundation`  
-**Implementation head before checkpoint docs:** `e7be8fda559242a34fbbd3b4814e16650b8bd139`
+**Implementation head:** `e7be8fda559242a34fbbd3b4814e16650b8bd139`
 
 ### Delivered
-- isolated codebase under `redhub-gateway/`;
+- isolated codebase `redhub-gateway/`;
 - Node.js 22 + TypeScript + Fastify;
 - Dockerfile multi-stage;
-- Docker Compose with PostgreSQL 17;
-- named PostgreSQL persistent volume;
-- named WhatsApp session persistent volume placeholder;
-- `.env.example`, `.gitignore`, `.dockerignore`;
-- migration runner + `001_foundation.sql`;
-- structured Fastify/Pino logging baseline;
-- `GET /health` with DB readiness;
-- graceful shutdown;
-- tests/typecheck/build scripts;
+- Docker Compose;
+- PostgreSQL 17;
+- persistent PostgreSQL volume;
+- persistent WhatsApp session volume placeholder;
+- env/gitignore/dockerignore baseline;
+- migration runner;
+- `GET /health`;
+- tests/typecheck/build;
 - GitHub Actions reproducibility gate.
 
-### Verification Evidence
-GitHub Actions run **37171019886** completed successfully:
-- `node-checks`: PASS;
-- npm install: PASS;
-- TypeScript typecheck: PASS;
-- unit tests: PASS;
-- build: PASS;
-- `compose-smoke`: PASS;
-- Docker image build/start: PASS;
-- gateway health: PASS;
-- PostgreSQL health: PASS;
-- migration query: PASS;
-- Docker Compose restart: PASS;
-- health after restart: PASS;
-- cleanup: PASS.
+### Verification
+GitHub Actions run **37171019886**:
+- typecheck PASS;
+- tests PASS;
+- build PASS;
+- Compose build/start PASS;
+- PostgreSQL health PASS;
+- migration PASS;
+- gateway health PASS;
+- restart smoke PASS.
 
-### Validation Note
-Initial Docker verification was executed on an isolated GitHub Actions Ubuntu/Docker runner because the authorized user-PC Remote Desktop Commander device was offline. This validates that the local-style Docker Compose stack is reproducible without touching production. A user-PC smoke run remains a useful sanity check before real QR pairing, but it is not a blocker for closing the foundation checkpoint.
+### Lock
+Foundation tetap dipakai. PostgreSQL pada scope terbaru hanya untuk metadata/log minimum bila diperlukan, **bukan campaign scheduler/queue engine**.
 
-### Locked Foundation
-- RedHub gateway local/private service port baseline: **3410**.
-- Production not deployed.
-- Backend RedHub not modified.
-- Baileys/pairing intentionally not implemented yet; belongs to WA-002.
-- Existing REDVOTE gateway root code/docs were not overwritten.
+### Next
+WA-001A / WA-002.
+
+---
+
+## WA-001A — Scope Simplification / Delivery-Layer Lock
+**Status: PASS / LOCKED**  
+**Date:** 2026-10-05  
+**Branch:** `feat/redhub-wa-002-session`
+
+### User Decision
+Backend RedHub **sudah memiliki**:
+- broadcast logic;
+- reminder H-1;
+- scheduling;
+- recipient selection;
+- meeting/event business logic.
+
+Karena itu WA Gateway harus dibangun **sederhana**.
+
+### Locked Responsibility Boundary
+
+```text
+RedHub Backend
+  -> decides who/when/what to send
+  -> calls internal gateway API
+
+WA Gateway
+  -> resolves tenant/device
+  -> sends text or PDF/document
+  -> returns provider result/error
+  -> maintains persistent WhatsApp sessions
+```
+
+### Removed from Gateway V1
+- campaign builder;
+- broadcast scheduler;
+- H-1 scheduler;
+- recipient segmentation;
+- campaign queue engine;
+- business retry orchestration;
+- business idempotency/duplicate policy;
+- invitation/meeting domain logic.
+
+### Still Required
+- multi-tenant;
+- persistent session;
+- reconnect;
+- text send;
+- PDF/document send;
+- auth;
+- tenant isolation;
+- minimal delivery result/log;
+- production deployment.
+
+### Evidence
+Documentation source of truth updated:
+- `REDHUB_WA_GATEWAY_START_HERE.md`;
+- `REDHUB_WA_GATEWAY_MASTER_HANDOFF.md`;
+- `REDHUB_WA_GATEWAY_CHECKPOINTS.md`;
+- `REDHUB_WA_GATEWAY_DECISIONS.md`;
+- `REDHUB_WA_GATEWAY_API_CONTRACT.md`.
+
+### Deployment State
+Not deployed. Local-first remains locked.
 
 ### Rollback
-The RedHub implementation is isolated under `redhub-gateway/` and its dedicated workflow. Rollback can remove that directory/workflow without changing the existing REDVOTE gateway code.
+If future requirements require gateway-side queue/scheduler, create a new decision/checkpoint. Do not silently restore superseded architecture.
 
 ### Next
 **WA-002 — WhatsApp Device & Persistent Session**
@@ -124,185 +153,157 @@ The RedHub implementation is isolated under `redhub-gateway/` and its dedicated 
 ## WA-002 — WhatsApp Device & Persistent Session
 **Status: IN PROGRESS**  
 **Branch:** `feat/redhub-wa-002-session`  
-**Implementation head:** `26eceab15455699893cd85fa573c9bd99a58bce5`
+**Implementation head before scope-doc revision:** `26eceab15455699893cd85fa573c9bd99a58bce5`
 
 ### Implemented
-- Baileys `7.0.0-rc14` provider runtime;
-- multi-file persistent auth state under dedicated session volume;
-- device state: DISCONNECTED / CONNECTING / PAIRING / CONNECTED / ERROR;
-- protected start/pair endpoint;
+- Baileys `7.0.0-rc14`;
+- multi-file persistent auth state;
+- DISCONNECTED / CONNECTING / PAIRING / CONNECTED / ERROR;
+- protected pairing endpoint;
 - protected device status endpoint;
-- protected JSON QR state endpoint;
-- protected PNG QR endpoint for real scan testing;
+- protected JSON QR endpoint;
+- protected PNG QR endpoint;
 - tenant/device ID validation;
-- automatic reconnect for non-logout disconnect;
-- optional environment-driven auto-start after process/container restart;
-- graceful manager shutdown;
-- session/auth data remains outside Git;
-- API token required for all pairing/status routes.
+- reconnect for non-logout disconnect;
+- optional auto-start after restart;
+- graceful shutdown;
+- session/auth data outside Git;
+- bearer token on pairing/status routes.
 
 ### Automated Verification
 GitHub Actions run **37171410041**: SUCCESS.
-- typecheck: PASS;
-- unit tests: PASS;
-- build: PASS;
-- Docker Compose build/start: PASS;
-- health/migration: PASS;
-- restart smoke: PASS.
-
-Unit tests verify:
-- pairing endpoints reject missing bearer token;
-- pairing start returns PAIRING state using fake manager;
-- protected status works;
-- protected QR JSON works;
-- protected QR PNG generation works.
+- typecheck PASS;
+- tests PASS;
+- build PASS;
+- Docker Compose PASS;
+- health/migration PASS;
+- restart smoke PASS.
 
 ### Remaining Real-Device Gate
-WA-002 MUST NOT be marked PASS/LOCKED until:
-1. one real WhatsApp test number is paired;
-2. status reaches CONNECTED;
-3. session files exist only in persistent Docker volume;
-4. container restart reconnects without a new QR;
-5. disconnect/reconnect behavior is observed;
-6. logs are checked to confirm no QR/session credentials are emitted.
+WA-002 belum boleh PASS/LOCKED sebelum:
+1. real WhatsApp test number paired;
+2. status CONNECTED;
+3. session persists in Docker volume;
+4. container restart reconnects without new QR;
+5. reconnect behavior verified;
+6. runtime logs verified clean of QR/session credential.
 
-### Acceptance Criteria
-- real test number pairing: **PENDING USER-DEVICE TEST**;
-- status CONNECTED: **PENDING USER-DEVICE TEST**;
-- container restart without new pairing: **PENDING USER-DEVICE TEST**;
-- disconnect/reconnect: **PENDING USER-DEVICE TEST**;
-- session directory not in Git: PASS;
-- credential/session not intentionally logged: code review PASS; runtime log check pending real test.
-
-### Next Immediate Action
-Run the WA-002 local pairing procedure in `redhub-gateway/README.md` on a machine with Docker, then provide the status/output so the checkpoint can be verified and locked.
+### Next After PASS
+**WA-003 — Text Delivery API**
 
 ---
 
-## WA-003 — Basic Sending
+## WA-003 — Text Delivery API
 **Status: PENDING**
 
 ### Required
-- phone normalization;
-- destination validation;
+- `POST /api/v1/messages/text`;
+- tenant/device resolve;
+- phone normalization/validation;
 - send text;
-- provider message id;
-- sent/failed persistence;
-- test-send endpoint.
+- return provider message ID/status/error;
+- no campaign logic.
 
-### Acceptance Criteria
-- 1 pesan test berhasil diterima;
-- provider message ID tersimpan;
-- nomor invalid ditolak;
-- error tidak membocorkan credential;
-- status DB sesuai hasil.
-
----
-
-## WA-004 — PDF Invitation
-**Status: PENDING**
-
-### Required
-- invitation template;
-- recipient personalization;
-- fetch/read PDF source;
-- PDF content/type validation;
-- human-readable filename;
-- send as WhatsApp document;
-- temp cleanup;
-- support same PDF source for many recipients without permanent duplication.
-
-### Acceptance Criteria
-- template tampil sesuai baseline;
-- nama penerima benar;
-- agenda/tanggal/jam/tempat benar;
-- PDF diterima sebagai file;
-- filename benar;
-- temp file bersih;
-- failure PDF menghasilkan error terkontrol.
+### Acceptance
+- one real text received;
+- invalid phone rejected;
+- wrong tenant/device rejected;
+- safe provider error;
+- no secret leakage.
 
 ---
 
-## WA-005 — Queue Engine
+## WA-004 — PDF / Document Delivery API
 **Status: PENDING**
 
 ### Required
-- persistent PostgreSQL queue;
-- worker;
-- PENDING -> PREPARING -> SENDING -> SENT;
-- failure states;
-- controlled processing;
-- restart recovery;
-- queue summary.
+- `POST /api/v1/messages/document`;
+- source URL/file handling;
+- MIME/type/size validation;
+- safe filename;
+- caption optional;
+- send WhatsApp document;
+- temp cleanup.
 
-### Acceptance Criteria
-- queue survive container restart;
-- pending jobs dilanjutkan;
-- sent job tidak diproses ulang;
-- failed job dapat diarahkan ke retry;
-- worker shutdown graceful.
+### Acceptance
+- one real PDF received as document;
+- filename correct;
+- caption correct when supplied;
+- invalid source rejected safely;
+- temp data cleaned.
 
 ---
 
-## WA-006 — Reliability & Idempotency
+## WA-005 — Multi-Tenant Isolation
 **Status: PENDING**
 
 ### Required
-- idempotency key unique;
-- duplicate request protection;
-- retry limit;
-- retry state;
-- attempt history;
-- safe recovery after crash/restart.
+- tenant registry/identity;
+- device/session ownership;
+- one default device per tenant baseline;
+- future multi-device compatible;
+- multiple tenant sessions can coexist.
 
-### Acceptance Criteria
-- request identik dua kali menghasilkan satu logical delivery;
-- retry history tercatat;
-- sent message tidak dikirim ulang oleh worker restart;
-- failure final teridentifikasi jelas.
+### Acceptance
+- tenant A cannot use tenant B session/device;
+- session paths isolated;
+- tenant-specific status/pairing/send works;
+- no permanent Jember hard-code in core.
 
 ---
 
-## WA-007 — Multi-Tenant Foundation
+## WA-006 — Minimal Delivery Log & Error Contract
 **Status: PENDING**
 
 ### Required
-- tenant table/model;
-- device belongs to tenant;
-- message belongs to tenant;
-- per-tenant default device;
-- isolation checks;
-- future multiple devices per tenant allowed by schema.
+- request/correlation ID;
+- tenant;
+- destination masked in logs;
+- provider message ID;
+- result SENT/FAILED;
+- safe error code/message;
+- timestamp.
 
-### Acceptance Criteria
-- tenant A tidak dapat menggunakan device tenant B;
-- queue/log filter per tenant;
-- pilot Jember berjalan sebagai tenant pertama;
-- tidak ada hard-coded permanent Jember ownership pada core.
+### Explicit Non-Goal
+No campaign queue, scheduler, campaign retry worker, or business duplicate engine.
 
 ---
 
-## WA-008 — Security & Audit
+## WA-007 — Security Gate
 **Status: PENDING**
 
 ### Required
-- internal API authentication;
-- request validation;
-- secret review;
-- session permission review;
-- URL/file validation;
-- PDF size limit;
+- bearer auth;
+- payload validation;
+- tenant ownership checks;
+- PDF/document limit;
+- safe URL policy;
 - filename sanitation;
-- phone masking support;
-- audit events;
-- no arbitrary public send endpoint.
+- secret/session review;
+- log hygiene;
+- no anonymous send.
 
-### Acceptance Criteria
-- unauthorized request rejected;
+### Acceptance
+- unauthorized rejected;
 - malformed payload rejected;
+- cross-tenant rejected;
 - secret scan clean;
-- auth/session files ignored by Git;
-- sensitive logs reviewed.
+- session not tracked by Git.
+
+---
+
+## WA-008 — Local RedHub Contract Validation
+**Status: PENDING**
+
+### Goal
+Validate that backend RedHub can call gateway without moving broadcast/reminder logic into gateway.
+
+### Acceptance
+- backend can send text request;
+- backend can send PDF request;
+- tenant mapping works;
+- gateway result/error can be consumed;
+- reminder H-1 remains triggered by backend RedHub.
 
 ---
 
@@ -312,96 +313,63 @@ Run the WA-002 local pairing procedure in `redhub-gateway/README.md` on a machin
 ### Target
 VPS `202.10.36.74`.
 
-### Baseline VPS
-- Ubuntu 24.04 LTS
-- 2 vCPU
-- 3.8 GiB RAM
-- 80 GB disk
-- ~73 GB available at baseline
-- swap 256 MB at baseline
-- Docker not installed at baseline
+### Required
+- Docker + Compose;
+- production env/secrets;
+- persistent session volume;
+- PostgreSQL only if required for metadata/log;
+- firewall/private network;
+- reverse proxy/HTTPS if necessary;
+- restart policy;
+- backup session/config;
+- monitoring baseline.
 
-### Required Before Deploy
-- upgrade swap target ~2 GB;
-- install Docker + Compose;
-- firewall;
-- production environment file;
-- persistent volumes;
-- backup plan;
-- service/container resource limits after measurement;
-- Nginx/HTTPS if endpoint exposure is needed;
-- private network/localhost access from RedHub when co-located.
-
-### Acceptance Criteria
-- gateway healthy after VPS reboot;
-- PostgreSQL healthy;
+### Acceptance
+- gateway healthy after reboot;
 - session survives restart;
 - no unintended public port;
-- backup/restore basic test;
-- monitoring basic PASS;
-- existing services not disrupted.
+- existing services unaffected;
+- backup/restore basic test PASS.
+
+### Safety
+VPS lama `202.10.45.147` tidak disentuh.
 
 ---
 
-## WA-010 — End-to-End Validation
+## WA-010 — Production End-to-End
 **Status: PENDING**
 
-### Staged Test
-1. 1 recipient.
-2. 10 recipients.
-3. 50 recipients.
-4. 100 recipients.
-
 ### Validate
-- personalized text;
-- PDF attachment;
-- queue;
-- delivery state;
+- RedHub backend -> gateway -> WhatsApp text;
+- RedHub backend -> gateway -> WhatsApp PDF;
+- multi-tenant routing;
+- H-1 reminder initiated by RedHub backend;
+- provider response/error handling;
 - restart recovery;
-- retry;
-- idempotency;
-- resource usage;
-- no uncontrolled duplicate.
+- no cross-tenant session use.
 
 ### Exit Gate
-Hanya jika WA-010 **PASS / LOCKED**, pekerjaan integrasi backend RedHub boleh dimulai.
+WA Gateway V1 COMPLETE hanya setelah WA-010 PASS / LOCKED.
 
 ---
 
-# RedHub Integration Phase
+## Superseded Old Planned Checkpoints
 
-## RH-WA-001 — RedHub Backend Client
-**Status: WAITING FOR WA-010**
+Rencana lama berikut tidak lagi menjadi capability wajib gateway:
+- old WA-005 Queue Engine;
+- old WA-006 Reliability & Idempotency business engine;
+- invitation renderer/business template inside gateway;
+- gateway-side broadcast/reminder orchestration.
 
-RedHub backend memanggil gateway API dengan tenant, participant, meeting dan PDF data.
-
-## RH-WA-002 — Device/Admin Integration
-**Status: WAITING FOR RH-WA-001**
-
-Expose device status/pairing sesuai role RedHub.
-
-## RH-WA-003 — Meeting Invitation Integration
-**Status: WAITING**
-
-Meeting + participant selection -> invitation jobs.
-
-## RH-WA-004 — Delivery Status UI
-**Status: WAITING**
-
-Admin melihat pending/sent/failed/retry state.
-
-## RH-WA-005 — Production Validation
-**Status: WAITING**
-
-End-to-end dari dashboard RedHub sampai WhatsApp anggota.
+Histori tidak dihapus; digantikan oleh WA-001A atas instruksi eksplisit user.
 
 ---
 
 ## CURRENT POSITION
 
-- **LAST PASS / LOCKED:** WA-001 — Local Docker Foundation
+- **LAST PASS / LOCKED:** WA-001A — Scope Simplification / Delivery-Layer Lock
 - **IN PROGRESS:** WA-002 — WhatsApp Device & Persistent Session
-- **NEXT AFTER PASS:** WA-003 — Basic Sending
+- **NEXT AFTER PASS:** WA-003 — Text Delivery API
 - **VPS DEPLOY:** NOT STARTED
-- **REDHUB BACKEND CHANGE:** NOT STARTED BY DESIGN
-- **Rule:** jangan melompati checkpoint wajib.
+- **TARGET VPS:** `202.10.36.74`
+- **WORKFLOW:** local first -> verified -> checkpoint -> production
