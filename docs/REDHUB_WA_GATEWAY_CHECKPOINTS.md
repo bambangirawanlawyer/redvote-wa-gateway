@@ -212,7 +212,7 @@ Local only. VPS deployment has not started.
 ---
 
 ## WA-003 — Text Delivery API
-**Status: IN PROGRESS**  
+**Status: PASS / LOCKED**  
 **Date:** 2026-10-05  
 **Branch:** `feat/redhub-wa-003-text-delivery`  
 **Implementation commit:** `5a816fd`  
@@ -263,12 +263,15 @@ Real send exposed hard-coded `libsignal` console output containing session ratch
 
 **Sensitive log scan: PASS**
 
-### Remaining Acceptance Gate
-- confirm at least one real test text is visibly received in WhatsApp: **WAITING USER CONFIRMATION**.
+### Final Real-Device Acceptance — 2026-10-05
+User confirmed **both controlled real test messages were visibly received in WhatsApp**.
 
-WA-003 MUST NOT be marked PASS / LOCKED until visible receipt is confirmed.
+### Acceptance Result
+**PASS / LOCKED**
 
-### Next After PASS
+Text delivery, tenant/device validation, provider response handling, real-device receipt, reconnect safety, and log hygiene are verified.
+
+### Next
 **WA-004 — PDF / Document Delivery API**
 
 ---
@@ -427,9 +430,9 @@ Histori tidak dihapus; digantikan oleh WA-001A atas instruksi eksplisit user.
 
 ## CURRENT POSITION
 
-- **LAST PASS / LOCKED:** WA-002 — WhatsApp Device & Persistent Session
-- **IN PROGRESS:** WA-003 — Text Delivery API (waiting visible receipt confirmation)
-- **NEXT AFTER PASS:** WA-004 — PDF / Document Delivery API
+- **LAST PASS / LOCKED:** WA-003 — Text Delivery API
+- **IN PROGRESS:** none
+- **NEXT:** WA-004 — PDF / Document Delivery API
 - **VPS DEPLOY:** NOT STARTED
 - **TARGET VPS:** `202.10.36.74`
 - **WORKFLOW:** local first -> verified -> checkpoint -> production
