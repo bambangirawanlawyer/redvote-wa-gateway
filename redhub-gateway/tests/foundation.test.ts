@@ -1,6 +1,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { buildApp, type HealthDatabase } from '../src/app.js';
+import {
+  createDocumentUrlPolicy,
+  fetchPdfWithPolicy,
+  isPrivateOrReservedAddress,
+  validateDocumentUrl
+} from '../src/security.js';
 import type {
   DeviceSnapshot,
   SendDocumentInput,
@@ -124,6 +130,7 @@ test('GET /health returns ok when database is reachable', async () => {
     db: healthyDb(),
     devices: new FakeDeviceManager(),
     apiTokenSecret: 'test-secret',
+    documentAllowedHosts: ['example.test'],
     logger: false,
     serviceVersion: 'test'
   });
@@ -157,6 +164,7 @@ test('GET /health returns degraded when database is unavailable', async () => {
     db,
     devices: new FakeDeviceManager(),
     apiTokenSecret: 'test-secret',
+    documentAllowedHosts: ['example.test'],
     logger: false,
     serviceVersion: 'test'
   });
@@ -184,6 +192,7 @@ test('pairing endpoint rejects missing bearer token', async () => {
     db: healthyDb(),
     devices: new FakeDeviceManager(),
     apiTokenSecret: 'test-secret',
+    documentAllowedHosts: ['example.test'],
     logger: false
   });
 
@@ -207,6 +216,7 @@ test('pairing flow exposes protected JSON and PNG QR state', async () => {
     db: healthyDb(),
     devices,
     apiTokenSecret: 'test-secret',
+    documentAllowedHosts: ['example.test'],
     logger: false
   });
 
@@ -260,6 +270,7 @@ test('text delivery rejects missing bearer token', async () => {
     db: healthyDb(),
     devices: new FakeDeviceManager(),
     apiTokenSecret: 'test-secret',
+    documentAllowedHosts: ['example.test'],
     logger: false
   });
 
@@ -289,6 +300,7 @@ test('text delivery returns provider message id', async () => {
     db: healthyDb(),
     devices,
     apiTokenSecret: 'test-secret',
+    documentAllowedHosts: ['example.test'],
     logger: false
   });
 
@@ -322,6 +334,7 @@ test('text delivery rejects cross-tenant device use', async () => {
     db: healthyDb(),
     devices,
     apiTokenSecret: 'test-secret',
+    documentAllowedHosts: ['example.test'],
     logger: false
   });
 
@@ -352,6 +365,7 @@ test('text delivery rejects invalid destination', async () => {
     db: healthyDb(),
     devices,
     apiTokenSecret: 'test-secret',
+    documentAllowedHosts: ['example.test'],
     logger: false
   });
 
@@ -383,6 +397,7 @@ test('text delivery returns safe provider error', async () => {
     db: healthyDb(),
     devices,
     apiTokenSecret: 'test-secret',
+    documentAllowedHosts: ['example.test'],
     logger: false
   });
 
@@ -417,6 +432,7 @@ test('document delivery rejects missing bearer token', async () => {
     db: healthyDb(),
     devices: new FakeDeviceManager(),
     apiTokenSecret: 'test-secret',
+    documentAllowedHosts: ['example.test'],
     logger: false
   });
 
@@ -447,6 +463,7 @@ test('document delivery fetches PDF in memory and sends filename/caption', async
     db: healthyDb(),
     devices,
     apiTokenSecret: 'test-secret',
+    documentAllowedHosts: ['example.test'],
     logger: false
   });
   const originalFetch = globalThis.fetch;
@@ -498,6 +515,7 @@ test('document delivery rejects invalid source protocol', async () => {
     db: healthyDb(),
     devices,
     apiTokenSecret: 'test-secret',
+    documentAllowedHosts: ['example.test'],
     logger: false
   });
 
@@ -529,6 +547,7 @@ test('document delivery rejects non-PDF content type', async () => {
     db: healthyDb(),
     devices,
     apiTokenSecret: 'test-secret',
+    documentAllowedHosts: ['example.test'],
     logger: false
   });
   const originalFetch = globalThis.fetch;
@@ -568,6 +587,7 @@ test('document delivery rejects oversized PDF before reading body', async () => 
     db: healthyDb(),
     devices,
     apiTokenSecret: 'test-secret',
+    documentAllowedHosts: ['example.test'],
     logger: false
   });
   const originalFetch = globalThis.fetch;
@@ -610,6 +630,7 @@ test('document delivery rejects cross-tenant access before fetching PDF', async 
     db: healthyDb(),
     devices,
     apiTokenSecret: 'test-secret',
+    documentAllowedHosts: ['example.test'],
     logger: false
   });
   const originalFetch = globalThis.fetch;
@@ -650,6 +671,7 @@ test('document delivery returns safe provider error', async () => {
     db: healthyDb(),
     devices,
     apiTokenSecret: 'test-secret',
+    documentAllowedHosts: ['example.test'],
     logger: false
   });
   const originalFetch = globalThis.fetch;
@@ -695,6 +717,7 @@ test('device status and listing require tenant context', async () => {
     db: healthyDb(),
     devices,
     apiTokenSecret: 'test-secret',
+    documentAllowedHosts: ['example.test'],
     logger: false
   });
 
@@ -727,6 +750,7 @@ test('same device id can coexist in different tenants with isolated lookup', asy
     db: healthyDb(),
     devices,
     apiTokenSecret: 'test-secret',
+    documentAllowedHosts: ['example.test'],
     logger: false
   });
 
@@ -766,6 +790,7 @@ test('single-device tenant is implicit default for text delivery', async () => {
     db: healthyDb(),
     devices,
     apiTokenSecret: 'test-secret',
+    documentAllowedHosts: ['example.test'],
     logger: false
   });
 
@@ -797,6 +822,7 @@ test('multi-device tenant requires explicit deviceId', async () => {
     db: healthyDb(),
     devices,
     apiTokenSecret: 'test-secret',
+    documentAllowedHosts: ['example.test'],
     logger: false
   });
 
@@ -834,6 +860,7 @@ test('text delivery writes masked SENT audit log and generates requestId', async
     db,
     devices,
     apiTokenSecret: 'test-secret',
+    documentAllowedHosts: ['example.test'],
     logger: false
   });
 
@@ -884,6 +911,7 @@ test('failed text delivery writes masked FAILED audit log with safe error', asyn
     db,
     devices,
     apiTokenSecret: 'test-secret',
+    documentAllowedHosts: ['example.test'],
     logger: false
   });
 
@@ -931,6 +959,7 @@ test('document delivery writes DOCUMENT audit log', async () => {
     db,
     devices,
     apiTokenSecret: 'test-secret',
+    documentAllowedHosts: ['example.test'],
     logger: false
   });
   const originalFetch = globalThis.fetch;
@@ -986,6 +1015,7 @@ test('delivery log database failure does not turn successful send into failure',
     db,
     devices,
     apiTokenSecret: 'test-secret',
+    documentAllowedHosts: ['example.test'],
     logger: false
   });
 
@@ -1018,6 +1048,7 @@ test('delivery endpoint rejects overlong requestId', async () => {
     db: healthyDb(),
     devices,
     apiTokenSecret: 'test-secret',
+    documentAllowedHosts: ['example.test'],
     logger: false
   });
 
@@ -1037,6 +1068,122 @@ test('delivery endpoint rejects overlong requestId', async () => {
 
     assert.equal(response.statusCode, 400);
     assert.equal(response.json().error.code, 'INVALID_REQUEST_ID');
+  } finally {
+    await app.close();
+  }
+});
+
+
+test('security policy rejects private/reserved addresses', async () => {
+  assert.equal(isPrivateOrReservedAddress('127.0.0.1'), true);
+  assert.equal(isPrivateOrReservedAddress('10.0.0.1'), true);
+  assert.equal(isPrivateOrReservedAddress('172.16.0.1'), true);
+  assert.equal(isPrivateOrReservedAddress('192.168.1.1'), true);
+  assert.equal(isPrivateOrReservedAddress('169.254.169.254'), true);
+  assert.equal(isPrivateOrReservedAddress('::1'), true);
+  assert.equal(isPrivateOrReservedAddress('fc00::1'), true);
+  assert.equal(isPrivateOrReservedAddress('8.8.8.8'), false);
+});
+
+test('document URL policy requires HTTPS unless host is explicitly allowlisted', async () => {
+  const policy = createDocumentUrlPolicy([]);
+
+  await assert.rejects(
+    () => validateDocumentUrl('http://8.8.8.8/file.pdf', policy),
+    /INVALID_DOCUMENT_SOURCE/
+  );
+  await assert.rejects(
+    () => validateDocumentUrl('https://127.0.0.1/file.pdf', policy),
+    /INVALID_DOCUMENT_SOURCE/
+  );
+  await assert.rejects(
+    () => validateDocumentUrl('https://user:pass@example.com/file.pdf', policy),
+    /INVALID_DOCUMENT_SOURCE/
+  );
+
+  const allowed = await validateDocumentUrl(
+    'http://host.docker.internal/file.pdf',
+    createDocumentUrlPolicy(['host.docker.internal'])
+  );
+  assert.equal(allowed.hostname, 'host.docker.internal');
+});
+
+test('document URL redirect cannot escape to private address', async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async () =>
+    new Response(null, {
+      status: 302,
+      headers: { location: 'http://127.0.0.1/private.pdf' }
+    })) as typeof fetch;
+
+  try {
+    await assert.rejects(
+      () =>
+        fetchPdfWithPolicy(
+          'http://example.test/start.pdf',
+          createDocumentUrlPolicy(['example.test']),
+          10 * 1024 * 1024
+        ),
+      /INVALID_DOCUMENT_SOURCE/
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('payload validation rejects unsafe tenant/device ids', async () => {
+  const devices = new FakeDeviceManager();
+  devices.connectForTest();
+  const app = buildApp({
+    db: healthyDb(),
+    devices,
+    apiTokenSecret: 'test-secret',
+    documentAllowedHosts: ['example.test'],
+    logger: false
+  });
+
+  try {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/v1/messages/text',
+      headers: { authorization: 'Bearer test-secret' },
+      payload: {
+        tenantId: '../tenant',
+        deviceId: 'jember-main',
+        to: '628123456789',
+        text: 'must-not-send'
+      }
+    });
+
+    assert.equal(response.statusCode, 400);
+    assert.equal(response.json().error.code, 'INVALID_TENANT_OR_DEVICE_ID');
+  } finally {
+    await app.close();
+  }
+});
+
+test('Fastify body limit rejects oversized JSON payload', async () => {
+  const app = buildApp({
+    db: healthyDb(),
+    devices: new FakeDeviceManager(),
+    apiTokenSecret: 'test-secret',
+    documentAllowedHosts: ['example.test'],
+    logger: false
+  });
+
+  try {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/v1/messages/text',
+      headers: { authorization: 'Bearer test-secret' },
+      payload: {
+        tenantId: 'jember',
+        to: '628123456789',
+        text: 'x'.repeat(70 * 1024)
+      }
+    });
+
+    assert.equal(response.statusCode, 413);
   } finally {
     await app.close();
   }

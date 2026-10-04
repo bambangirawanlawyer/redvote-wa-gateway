@@ -1,4 +1,4 @@
-import { mkdir } from 'node:fs/promises';
+import { chmod, mkdir } from 'node:fs/promises';
 import { buildApp } from './app.js';
 import { loadConfig } from './config.js';
 import { createPool } from './db.js';
@@ -32,6 +32,7 @@ const config = loadConfig();
 const pool = createPool(config.databaseUrl);
 
 await mkdir(config.sessionDir, { recursive: true, mode: 0o700 });
+await chmod(config.sessionDir, 0o700);
 await runMigrations(pool);
 
 const devices = new BaileysDeviceManager({
@@ -47,7 +48,14 @@ const app = buildApp({
   db: pool,
   devices,
   apiTokenSecret: config.apiTokenSecret,
-  logger: { level: config.logLevel },
+  documentAllowedHosts: config.documentAllowedHosts,
+  logger: {
+    level: config.logLevel,
+    redact: {
+      paths: ['req.headers.authorization'],
+      censor: '[REDACTED]'
+    }
+  },
   serviceVersion: config.serviceVersion
 });
 

@@ -1,5 +1,5 @@
 import type { Dirent } from 'node:fs';
-import { access, mkdir, readdir, rename } from 'node:fs/promises';
+import { access, chmod, mkdir, readdir, rename } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { Boom } from '@hapi/boom';
 import pino from 'pino';
@@ -82,6 +82,7 @@ export class BaileysDeviceManager implements WhatsAppDeviceManager {
 
     try {
       const result = await runtime.socket!.sendMessage(`${to}@s.whatsapp.net`, { text });
+      await this.hardenAuthDir(this.authDir(runtime));
       return {
         tenantId: runtime.tenantId,
         deviceId: runtime.deviceId,
@@ -107,6 +108,7 @@ export class BaileysDeviceManager implements WhatsAppDeviceManager {
         fileName: input.filename,
         caption: input.caption
       });
+      await this.hardenAuthDir(this.authDir(runtime));
       return {
         tenantId: runtime.tenantId,
         deviceId: runtime.deviceId,
@@ -208,8 +210,10 @@ export class BaileysDeviceManager implements WhatsAppDeviceManager {
     runtime.lastErrorCode = undefined;
 
     try {
-      const authDir = resolve(this.sessionDir, runtime.tenantId, runtime.deviceId);
+      const authDir = this.authDir(runtime);
       await mkdir(authDir, { recursive: true, mode: 0o700 });
+      await chmod(authDir, 0o700);
+      await this.hardenAuthDir(authDir);
 
       const { state, saveCreds } = await useMultiFileAuthState(authDir);
 
@@ -224,7 +228,12 @@ export class BaileysDeviceManager implements WhatsAppDeviceManager {
 
       runtime.socket = socket;
 
-      socket.ev.on('creds.update', saveCreds);
+      socket.ev.on('creds.update', () => {
+        void (async () => {
+          await saveCreds();
+          await this.hardenAuthDir(authDir);
+        })().catch(() => undefined);
+      });
 
       socket.ev.on('connection.update', (update) => {
         if (update.qr) {
@@ -238,6 +247,7 @@ export class BaileysDeviceManager implements WhatsAppDeviceManager {
           runtime.phone = this.normalizeUserId(socket.user?.id);
           runtime.lastConnectedAt = new Date().toISOString();
           runtime.lastErrorCode = undefined;
+          void this.hardenAuthDir(authDir);
         }
 
         if (update.connection === 'close') {
@@ -334,6 +344,26 @@ export class BaileysDeviceManager implements WhatsAppDeviceManager {
 
   private deviceKey(tenantId: string, deviceId: string): string {
     return `${tenantId}::${deviceId}`;
+  }
+
+  private authDir(runtime: Pick<RuntimeDevice, 'tenantId' | 'deviceId'>): string {
+    return resolve(this.sessionDir, runtime.tenantId, runtime.deviceId);
+  }
+
+  private async hardenAuthDir(authDir: string): Promise<void> {
+    try {
+      await chmod(authDir, 0o700);
+      const entries = await readdir(authDir, { withFileTypes: true });
+      await Promise.all(
+        entries.map(async (entry) => {
+          const entryPath = resolve(authDir, entry.name);
+          if (entry.isFile()) await chmod(entryPath, 0o600);
+          if (entry.isDirectory()) await chmod(entryPath, 0o700);
+        })
+      );
+    } catch {
+      // Security hardening is best-effort here; startup/runtime verification checks permissions.
+    }
   }
 
   private async migrateLegacySessionIfNeeded(): Promise<void> {

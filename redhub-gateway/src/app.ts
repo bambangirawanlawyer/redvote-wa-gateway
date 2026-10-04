@@ -10,6 +10,10 @@ import {
   insertDeliveryLog,
   type DeliveryLogInput
 } from './delivery-log.js';
+import {
+  createDocumentUrlPolicy,
+  fetchPdfWithPolicy
+} from './security.js';
 import type { WhatsAppDeviceManager } from './whatsapp/types.js';
 
 export type HealthDatabase = {
@@ -20,72 +24,22 @@ export type BuildAppOptions = {
   db: HealthDatabase;
   devices: WhatsAppDeviceManager;
   apiTokenSecret: string;
+  documentAllowedHosts?: string[];
   logger?: boolean | Record<string, unknown>;
   serviceVersion?: string;
 };
 
 const MAX_PDF_BYTES = 10 * 1024 * 1024;
+const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
+
+function isSafeId(value: string | undefined): value is string {
+  return Boolean(value && SAFE_ID.test(value));
+}
 
 function sanitizePdfFilename(value: string): string {
   const safe = basename(value.trim()).replace(/[^A-Za-z0-9._ -]/g, '_').slice(0, 120);
   if (!safe || safe === '.' || safe === '..') throw new Error('INVALID_DOCUMENT_FILENAME');
   return safe.toLowerCase().endsWith('.pdf') ? safe : `${safe}.pdf`;
-}
-
-async function fetchPdfDocument(documentUrl: string): Promise<Buffer> {
-  let url: URL;
-  try {
-    url = new URL(documentUrl);
-  } catch {
-    throw new Error('INVALID_DOCUMENT_SOURCE');
-  }
-
-  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
-    throw new Error('INVALID_DOCUMENT_SOURCE');
-  }
-
-  let response: Response;
-  try {
-    response = await fetch(url, { redirect: 'follow' });
-  } catch {
-    throw new Error('INVALID_DOCUMENT_SOURCE');
-  }
-
-  if (!response.ok) throw new Error('INVALID_DOCUMENT_SOURCE');
-
-  const contentLength = Number(response.headers.get('content-length') ?? '0');
-  if (Number.isFinite(contentLength) && contentLength > MAX_PDF_BYTES) {
-    throw new Error('DOCUMENT_TOO_LARGE');
-  }
-
-  const contentType = (response.headers.get('content-type') ?? '').toLowerCase();
-  if (!contentType.includes('application/pdf')) {
-    throw new Error('UNSUPPORTED_DOCUMENT_TYPE');
-  }
-
-  if (!response.body) throw new Error('INVALID_DOCUMENT_SOURCE');
-
-  const reader = response.body.getReader();
-  const chunks: Buffer[] = [];
-  let totalBytes = 0;
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    totalBytes += value.byteLength;
-    if (totalBytes > MAX_PDF_BYTES) {
-      await reader.cancel();
-      throw new Error('DOCUMENT_TOO_LARGE');
-    }
-    chunks.push(Buffer.from(value));
-  }
-
-  if (totalBytes === 0) throw new Error('INVALID_DOCUMENT_SOURCE');
-  const bytes = Buffer.concat(chunks, totalBytes);
-  if (bytes.subarray(0, 5).toString('ascii') !== '%PDF-') {
-    throw new Error('UNSUPPORTED_DOCUMENT_TYPE');
-  }
-  return bytes;
 }
 
 function secureBearerMatches(header: string | undefined, secret: string): boolean {
@@ -99,8 +53,10 @@ function secureBearerMatches(header: string | undefined, secret: string): boolea
 }
 
 export function buildApp(options: BuildAppOptions): FastifyInstance {
+  const documentUrlPolicy = createDocumentUrlPolicy(options.documentAllowedHosts ?? []);
   const app = Fastify({
-    logger: options.logger ?? true
+    logger: options.logger ?? true,
+    bodyLimit: 64 * 1024
   });
 
   async function recordDeliveryLogSafe(input: DeliveryLogInput): Promise<void> {
@@ -169,6 +125,14 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
           }
         });
       }
+      if (!isSafeId(body.tenantId) || !isSafeId(deviceId)) {
+        return reply.code(400).send({
+          error: {
+            code: 'INVALID_TENANT_OR_DEVICE_ID',
+            message: 'tenantId or deviceId is invalid'
+          }
+        });
+      }
 
       try {
         const snapshot = await options.devices.start({
@@ -207,6 +171,11 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
           }
         });
       }
+      if (!isSafeId(tenantId)) {
+        return reply.code(400).send({
+          error: { code: 'INVALID_TENANT_ID', message: 'tenantId is invalid' }
+        });
+      }
       return { tenantId, devices: options.devices.list(tenantId) };
     }
   );
@@ -222,6 +191,14 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
           error: {
             code: 'TENANT_REQUIRED',
             message: 'tenantId is required'
+          }
+        });
+      }
+      if (!isSafeId(tenantId) || !isSafeId(deviceId)) {
+        return reply.code(400).send({
+          error: {
+            code: 'INVALID_TENANT_OR_DEVICE_ID',
+            message: 'tenantId or deviceId is invalid'
           }
         });
       }
@@ -251,6 +228,14 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
           error: {
             code: 'TENANT_REQUIRED',
             message: 'tenantId is required'
+          }
+        });
+      }
+      if (!isSafeId(tenantId) || !isSafeId(deviceId)) {
+        return reply.code(400).send({
+          error: {
+            code: 'INVALID_TENANT_OR_DEVICE_ID',
+            message: 'tenantId or deviceId is invalid'
           }
         });
       }
@@ -284,6 +269,14 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
           error: {
             code: 'TENANT_REQUIRED',
             message: 'tenantId is required'
+          }
+        });
+      }
+      if (!isSafeId(tenantId) || !isSafeId(deviceId)) {
+        return reply.code(400).send({
+          error: {
+            code: 'INVALID_TENANT_OR_DEVICE_ID',
+            message: 'tenantId or deviceId is invalid'
           }
         });
       }
@@ -328,6 +321,16 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
           error: {
             code: 'INVALID_REQUEST',
             message: 'tenantId, to, and text are required'
+          }
+        });
+      }
+      if (!isSafeId(body.tenantId) || (body.deviceId && !isSafeId(body.deviceId))) {
+        return reply.code(400).send({
+          success: false,
+          requestId: body.requestId,
+          error: {
+            code: 'INVALID_TENANT_OR_DEVICE_ID',
+            message: 'tenantId or deviceId is invalid'
           }
         });
       }
@@ -431,6 +434,16 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
           }
         });
       }
+      if (!isSafeId(body.tenantId) || (body.deviceId && !isSafeId(body.deviceId))) {
+        return reply.code(400).send({
+          success: false,
+          requestId: body.requestId,
+          error: {
+            code: 'INVALID_TENANT_OR_DEVICE_ID',
+            message: 'tenantId or deviceId is invalid'
+          }
+        });
+      }
 
       const requestId = body.requestId?.trim() || randomUUID();
       if (requestId.length > 128) {
@@ -465,7 +478,11 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
           if (tenantDevices[0]?.status !== 'CONNECTED') throw new Error('DEVICE_NOT_CONNECTED');
         }
 
-        const document = await fetchPdfDocument(body.documentUrl);
+        const document = await fetchPdfWithPolicy(
+          body.documentUrl,
+          documentUrlPolicy,
+          MAX_PDF_BYTES
+        );
         const filename = sanitizePdfFilename(body.filename);
         const caption = body.caption?.trim();
         if (caption && caption.length > 1024) throw new Error('INVALID_DOCUMENT_CAPTION');

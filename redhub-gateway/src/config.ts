@@ -8,6 +8,21 @@ function required(name: string, fallback?: string): string {
   return value;
 }
 
+function secret(name: string): string {
+  const value = required(name).trim();
+  if (value.length < 32 || value.toUpperCase().includes('CHANGE_ME')) {
+    throw new Error(`${name} must be at least 32 characters and not a placeholder`);
+  }
+  return value;
+}
+
+function csv(name: string): string[] {
+  return (process.env[name] ?? '')
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean);
+}
+
 function port(name: string, fallback: number): number {
   const raw = process.env[name];
   if (!raw) return fallback;
@@ -24,6 +39,7 @@ export type AppConfig = {
   port: number;
   databaseUrl: string;
   apiTokenSecret: string;
+  documentAllowedHosts: string[];
   sessionDir: string;
   logLevel: string;
   serviceVersion: string;
@@ -39,7 +55,8 @@ export function loadConfig(): AppConfig {
     host: process.env.HOST ?? '0.0.0.0',
     port: port('PORT', 3410),
     databaseUrl: required('DATABASE_URL'),
-    apiTokenSecret: required('API_TOKEN_SECRET'),
+    apiTokenSecret: secret('API_TOKEN_SECRET'),
+    documentAllowedHosts: csv('DOCUMENT_ALLOWED_HOSTS'),
     sessionDir: process.env.SESSION_DIR ?? './data/whatsapp-sessions',
     logLevel: process.env.LOG_LEVEL ?? 'info',
     serviceVersion: process.env.SERVICE_VERSION ?? '0.1.0',
