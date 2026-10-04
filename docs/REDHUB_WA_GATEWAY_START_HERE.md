@@ -4,107 +4,133 @@ Gunakan file ini setiap kali pekerjaan dilanjutkan dari chat/account baru.
 
 ## Project Identity
 
-Project yang sedang dikerjakan adalah:
+Project: **REDHUB WA GATEWAY**
 
-**REDHUB WA GATEWAY**
+Tujuan V1:
+membangun delivery gateway WhatsApp mandiri untuk RedHub sebagai pengganti Fonnte pada jalur pengiriman pesan.
 
-Tujuan:
-membangun gateway WhatsApp mandiri khusus pengiriman undangan RedHub agar tidak bergantung pada Fonnte.
+Gateway **bukan** tempat business logic broadcast/reminder. Backend RedHub sudah memiliki:
+- pemilihan penerima;
+- broadcast orchestration;
+- reminder H-1;
+- jadwal pengiriman;
+- data rapat/kegiatan;
+- template/business context.
 
-## Important Repository Warning
+Gateway hanya bertugas:
+1. menerima request dari backend RedHub;
+2. memilih session/device milik tenant;
+3. mengirim text atau PDF/document ke WhatsApp;
+4. mengembalikan hasil/provider message ID/error;
+5. menjaga session WhatsApp multi-tenant tetap persisten;
+6. menyimpan log delivery minimum bila diperlukan.
 
-Repository saat ini bernama:
+## Repository
 
+Source of truth saat ini:
 `bambangirawanlawyer/redvote-wa-gateway`
 
-Repository tersebut sudah memiliki project/dokumentasi **REDVOTE WA Gateway** yang lebih lama.
-
-JANGAN:
-- menganggap dokumen REDVOTE sebagai requirement RedHub WA Gateway;
-- overwrite `docs/MASTER_HANDOFF.md`, `docs/CHECKPOINTS.md`, atau `docs/DECISIONS.md` REDVOTE;
-- mencampur checkpoint REDVOTE `CP-xxx` dengan checkpoint RedHub `WA-xxx`.
-
-Untuk project RedHub WA Gateway, source of truth hanya file dengan prefix:
-
+Dokumen RedHub Gateway hanya file ber-prefix:
 - `docs/REDHUB_WA_GATEWAY_MASTER_HANDOFF.md`
 - `docs/REDHUB_WA_GATEWAY_CHECKPOINTS.md`
 - `docs/REDHUB_WA_GATEWAY_DECISIONS.md`
 - `docs/REDHUB_WA_GATEWAY_API_CONTRACT.md`
 - file ini.
 
-Jika repository dedicated `redhub-wa-gateway` dibuat kemudian, pindahkan dokumen/kode RedHub Gateway ke repository tersebut dan catat migration handoff.
+Jangan overwrite dokumen REDVOTE lama.
 
-## Mandatory Read Order
+## Architecture Lock — 2026-10-05
 
-Sebelum mengerjakan kode:
+```text
+RedHub Backend
+  |-- broadcast logic
+  |-- reminder H-1
+  |-- recipient selection
+  |-- scheduling
+  |
+  | REST internal API
+  v
+RedHub WA Gateway
+  |-- tenant/device resolver
+  |-- Baileys adapter
+  |-- persistent WA session
+  |-- text sender
+  |-- PDF/document sender
+  `-- minimal delivery result/log
+  |
+  v
+WhatsApp
+```
 
-1. baca `REDHUB_WA_GATEWAY_MASTER_HANDOFF.md`;
-2. baca `REDHUB_WA_GATEWAY_CHECKPOINTS.md`;
-3. baca `REDHUB_WA_GATEWAY_DECISIONS.md`;
-4. baca `REDHUB_WA_GATEWAY_API_CONTRACT.md`;
-5. cek commit terakhir dan working tree;
-6. lanjut hanya dari checkpoint NEXT.
+## Explicitly NOT in Gateway
 
-## Current State
+- campaign builder;
+- broadcast scheduler;
+- reminder scheduler;
+- recipient segmentation;
+- meeting business logic;
+- queue orchestration for campaign processing;
+- business retry policy;
+- idempotency/business duplicate rules;
+- CRM/chatbot/inbox/AI.
 
-- Last checkpoint: **WA-001 — Local Docker Foundation — PASS / LOCKED**
-- Current checkpoint: **WA-002 — WhatsApp Device & Persistent Session — IN PROGRESS**
-- Production deploy: **belum**
-- RedHub backend integration: **belum, sengaja ditunda**
-- Production target VPS: **202.10.36.74**
-- Pilot tenant: **Jember**
-- Pilot WhatsApp device: **1 nomor**
-- Provider V1: **Baileys**
-- Local development: **Docker Compose**
-- Queue/persistence: **PostgreSQL**
-- Redis: **tidak diperlukan pada V1**
-- PDF: **wajib dikirim sebagai document attachment**
-- Multi-tenant future default: **1 kabupaten = 1 nomor WA**
+Jika reliability minimum dibutuhkan di gateway, implementasinya harus tetap kecil dan tidak mengambil alih tanggung jawab backend RedHub.
 
-## Non-Negotiable Workflow
+## Multi-Tenant
+
+Gateway tetap multi-tenant.
+
+Baseline:
+- satu tenant memiliki satu default WhatsApp device/session;
+- future dapat lebih dari satu device;
+- session/device tenant A tidak boleh dipakai tenant B;
+- pilot pertama: Jember.
+
+## Development Strategy
+
+**LOCAL FIRST — LOCKED**
+
+Bangun dan uji di local Docker terlebih dahulu. Deploy ke VPS hanya setelah:
+- pairing/session PASS;
+- session survive restart;
+- text send PASS;
+- PDF/document send PASS;
+- tenant isolation PASS;
+- auth/security baseline PASS.
+
+Production VPS:
+`202.10.36.74`
+
+VPS lama `202.10.45.147` tidak disentuh kecuali ada instruksi eksplisit.
+
+## Current Checkpoint
+
+- WA-000 — historical architecture baseline — PASS / LOCKED
+- WA-001 — Local Docker Foundation — PASS / LOCKED
+- WA-001A — Scope Simplification: RedHub Owns Broadcast/Reminder — PASS / LOCKED
+- WA-002 — WhatsApp Device & Persistent Session — IN PROGRESS
+- Production deploy — NOT STARTED
+
+## Mandatory Workflow
 
 ```text
 implement
   -> test
   -> PASS
   -> commit
-  -> update checkpoint
+  -> update checkpoint evidence
   -> LOCK
   -> next checkpoint
 ```
 
-Jangan melakukan beberapa checkpoint sekaligus tanpa verification.
-
-## Scope Reminder
-
-V1 hanya:
-- pairing/session;
-- outbound invitation;
-- personalized template;
-- PDF attachment;
-- queue;
-- retry;
-- anti duplicate;
-- logs;
-- multi-tenant/device foundation;
-- security;
-- production deployment.
-
-Bukan:
-- chatbot;
-- inbox;
-- AI;
-- CRM;
-- campaign marketing;
-- auto reply;
-- public WhatsApp SaaS.
+Tidak boleh mengklaim PASS tanpa verifikasi.
 
 ## Next Action
 
-Kerjakan:
+Selesaikan **WA-002** di local:
+- pair satu nomor test;
+- status CONNECTED;
+- restart container tanpa QR baru;
+- reconnect/log hygiene.
 
-**WA-002 — WhatsApp Device & Persistent Session**
-
-Implementation + CI gate sudah PASS. Remaining gate adalah **real WhatsApp pairing**: pair satu nomor test, verifikasi CONNECTED, restart container tanpa QR baru, dan cek reconnect/log hygiene.
-
-Jangan deploy VPS atau mengubah backend RedHub sebelum WA-002 PASS / LOCKED.
+Setelah WA-002 PASS / LOCKED, lanjut **WA-003 — Text Delivery API**.
