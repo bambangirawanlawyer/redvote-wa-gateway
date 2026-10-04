@@ -279,3 +279,17 @@ Jika tidak diperlukan untuk:
 - tenant/device foundation;
 - security;
 maka default-nya ditunda.
+
+
+## RHWA-D-033 — Dedicated RedHub Gateway Port
+RedHub WA Gateway uses port **3410** as the local/private service baseline.
+
+Reason:
+- existing REDVOTE WA Gateway historically reserves/plans port 3400;
+- RedHub gateway is isolated and must not collide with the REDVOTE service;
+- production exposure, if needed, should occur through private networking or reverse proxy rather than opening 3410 broadly.
+
+## RHWA-D-034 — WA-001 Reproducibility Evidence
+WA-001 foundation may be locked using an isolated Docker CI runner when it validates the same Docker Compose build/start/health/migration/restart behavior without touching production.
+
+For WA-002 and later checkpoints that require a real WhatsApp account/QR/session, real device validation is mandatory and CI simulation is not a substitute.

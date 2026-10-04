@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.env
+.env.*
+!.env.example
+logs/
+coverage/
+*.log
+.DS_Store
+data/postgres/
+data/whatsapp-sessions/
+sessions/

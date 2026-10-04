@@ -67,48 +67,62 @@ PASS — architecture, scope, message/PDF requirement, multi-tenant direction, l
 ---
 
 ## WA-001 — Local Docker Foundation
-**Status: NEXT**
+**Status: PASS / LOCKED**  
+**Date:** 2026-10-04  
+**Branch:** `feat/redhub-wa-001-foundation`  
+**Implementation head before checkpoint docs:** `e7be8fda559242a34fbbd3b4814e16650b8bd139`
 
-### Goal
-Membuat foundation gateway yang reproducible di local PC.
+### Delivered
+- isolated codebase under `redhub-gateway/`;
+- Node.js 22 + TypeScript + Fastify;
+- Dockerfile multi-stage;
+- Docker Compose with PostgreSQL 17;
+- named PostgreSQL persistent volume;
+- named WhatsApp session persistent volume placeholder;
+- `.env.example`, `.gitignore`, `.dockerignore`;
+- migration runner + `001_foundation.sql`;
+- structured Fastify/Pino logging baseline;
+- `GET /health` with DB readiness;
+- graceful shutdown;
+- tests/typecheck/build scripts;
+- GitHub Actions reproducibility gate.
 
-### Required
-- Node.js + TypeScript project.
-- Fastify server.
-- Dockerfile.
-- docker-compose.yml.
-- PostgreSQL container.
-- Persistent data volume.
-- Persistent WhatsApp session volume placeholder.
-- `.env.example`.
-- Secret-safe `.gitignore`.
-- Migration mechanism.
-- Structured logging baseline.
-- `GET /health`.
-- Graceful shutdown.
-- Test/build scripts.
+### Verification Evidence
+GitHub Actions run **37171019886** completed successfully:
+- `node-checks`: PASS;
+- npm install: PASS;
+- TypeScript typecheck: PASS;
+- unit tests: PASS;
+- build: PASS;
+- `compose-smoke`: PASS;
+- Docker image build/start: PASS;
+- gateway health: PASS;
+- PostgreSQL health: PASS;
+- migration query: PASS;
+- Docker Compose restart: PASS;
+- health after restart: PASS;
+- cleanup: PASS.
 
-### Acceptance Criteria
-- `docker compose build` PASS.
-- `docker compose up -d` PASS.
-- gateway container healthy.
-- PostgreSQL healthy.
-- migration PASS.
-- health endpoint returns expected response.
-- restart containers without data loss.
-- no secret committed.
-- working tree clean after commit.
-- checkpoint updated with commit SHA.
+### Validation Note
+Initial Docker verification was executed on an isolated GitHub Actions Ubuntu/Docker runner because the authorized user-PC Remote Desktop Commander device was offline. This validates that the local-style Docker Compose stack is reproducible without touching production. A user-PC smoke run remains a useful sanity check before real QR pairing, but it is not a blocker for closing the foundation checkpoint.
 
-### Must Not Do
-- Jangan pairing WhatsApp sebelum foundation PASS.
-- Jangan deploy VPS pada tahap ini.
-- Jangan ubah backend RedHub.
+### Locked Foundation
+- RedHub gateway local/private service port baseline: **3410**.
+- Production not deployed.
+- Backend RedHub not modified.
+- Baileys/pairing intentionally not implemented yet; belongs to WA-002.
+- Existing REDVOTE gateway root code/docs were not overwritten.
+
+### Rollback
+The RedHub implementation is isolated under `redhub-gateway/` and its dedicated workflow. Rollback can remove that directory/workflow without changing the existing REDVOTE gateway code.
+
+### Next
+**WA-002 — WhatsApp Device & Persistent Session**
 
 ---
 
 ## WA-002 — WhatsApp Device & Persistent Session
-**Status: PENDING**
+**Status: NEXT**
 
 ### Required
 - Baileys provider adapter.
@@ -350,8 +364,8 @@ End-to-end dari dashboard RedHub sampai WhatsApp anggota.
 
 ## CURRENT POSITION
 
-- **LAST PASS / LOCKED:** WA-000 — Architecture & Contract
-- **NEXT:** WA-001 — Local Docker Foundation
+- **LAST PASS / LOCKED:** WA-001 — Local Docker Foundation
+- **NEXT:** WA-002 — WhatsApp Device & Persistent Session
 - **VPS DEPLOY:** NOT STARTED
 - **REDHUB BACKEND CHANGE:** NOT STARTED BY DESIGN
 - **Rule:** jangan melompati checkpoint wajib.

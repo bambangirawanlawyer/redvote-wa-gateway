@@ -1,0 +1,70 @@
+name: RedHub WA Gateway CI
+
+on:
+  push:
+    branches:
+      - main
+      - "feat/redhub-wa-*"
+    paths:
+      - "redhub-gateway/**"
+      - ".github/workflows/redhub-wa-ci.yml"
+  pull_request:
+    paths:
+      - "redhub-gateway/**"
+      - ".github/workflows/redhub-wa-ci.yml"
+
+jobs:
+  node-checks:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: redhub-gateway
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: redhub-gateway/package.json
+      - run: npm install
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+
+  compose-smoke:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: redhub-gateway
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and start stack
+        run: docker compose up -d --build
+      - name: Wait for gateway health
+        run: |
+          for i in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:3410/health; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker compose ps
+          docker compose logs
+          exit 1
+      - name: Verify migration
+        run: docker compose exec -T db psql -U redhub_wa_app -d redhub_wa -c "SELECT name, applied_at FROM schema_migrations ORDER BY name;"
+      - name: Restart persistence smoke test
+        run: |
+          docker compose restart
+          for i in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:3410/health; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker compose ps
+          docker compose logs
+          exit 1
+      - name: Cleanup
+        if: always()
+        run: docker compose down -v

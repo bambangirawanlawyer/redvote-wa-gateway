@@ -443,7 +443,17 @@ Output:
 - API baseline.
 
 ### WA-001 — Local Docker Foundation
-Status: **NEXT**
+Status: **PASS / LOCKED**
+
+Verified on 2026-10-04 via GitHub Actions Docker runner:
+- typecheck/test/build PASS;
+- Docker Compose build/start PASS;
+- PostgreSQL + migration PASS;
+- health PASS;
+- restart persistence smoke PASS.
+
+Implementation directory: `redhub-gateway/`.
+Service port baseline: `3410`.
 
 Target:
 - repository/service skeleton;
@@ -457,6 +467,8 @@ Target:
 - tests/build.
 
 ### WA-002 — WhatsApp Device & Persistent Session
+Status: **NEXT**
+
 - Baileys adapter;
 - QR pairing;
 - session persistence;
@@ -565,11 +577,11 @@ Gateway V1 dinyatakan COMPLETE hanya jika:
 
 ## 20. Current Position
 
-**LAST CHECKPOINT:** WA-000 — Architecture & Contract — PASS / LOCKED  
-**CURRENT PHASE:** WA-001 — Local Docker Foundation  
+**LAST CHECKPOINT:** WA-001 — Local Docker Foundation — PASS / LOCKED  
+**CURRENT PHASE:** WA-002 — WhatsApp Device & Persistent Session  
 **DEPLOYMENT:** Belum dilakukan  
 **REDHUB BACKEND INTEGRATION:** Belum dilakukan, sengaja ditunda sampai gateway selesai  
-**NEXT ACTION:** bangun WA-001 di lokal menggunakan Docker, verifikasi acceptance criteria, lalu catat commit + hasil test di checkpoint.
+**NEXT ACTION:** implement WA-002 Baileys provider adapter + device/session persistence + protected pairing state, lalu lakukan pairing nyata dengan satu nomor WhatsApp test.
 
 ## 21. Aturan Handoff Chat Baru
 

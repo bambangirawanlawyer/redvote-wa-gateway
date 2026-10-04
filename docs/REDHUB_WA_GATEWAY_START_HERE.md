@@ -47,8 +47,8 @@ Sebelum mengerjakan kode:
 
 ## Current State
 
-- Last checkpoint: **WA-000 — PASS / LOCKED**
-- Current checkpoint: **WA-001 — Local Docker Foundation**
+- Last checkpoint: **WA-001 — Local Docker Foundation — PASS / LOCKED**
+- Current checkpoint: **WA-002 — WhatsApp Device & Persistent Session**
 - Production deploy: **belum**
 - RedHub backend integration: **belum, sengaja ditunda**
 - Production target VPS: **202.10.36.74**
@@ -101,8 +101,10 @@ Bukan:
 
 ## Next Action
 
-Kerjakan hanya:
+Kerjakan:
 
-**WA-001 — Local Docker Foundation**
+**WA-002 — WhatsApp Device & Persistent Session**
 
-Jangan pairing WhatsApp, deploy VPS, atau mengubah backend RedHub sebelum acceptance criteria checkpoint yang relevan terpenuhi.
+Implement Baileys adapter, device/session state, protected pairing/QR flow, persistent session volume, reconnect, dan restart-survival test.
+
+Jangan deploy VPS atau mengubah backend RedHub. Pairing nyata memerlukan satu nomor WhatsApp test dan harus diverifikasi pada environment yang dapat diakses user.
