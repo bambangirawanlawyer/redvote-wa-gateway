@@ -1,114 +1,57 @@
-# REDHUB WA Gateway — API Contract Baseline
+# REDHUB WA Gateway — API Contract V1
 
-> Status: WA-000 contract baseline. Detail implementation boleh berubah pada WA-001/WA-002 selama semantic contract dan keputusan LOCKED tetap dipertahankan.
+> Revised **2026-10-05**.
+> Gateway adalah simple multi-tenant delivery layer. Broadcast, reminder H-1, scheduling, recipient selection, dan business retry berada di backend RedHub.
 
-Base path baseline:
+Base path:
 `/api/v1`
 
-## 1. General Rules
+## 1. Authentication
 
-### Authentication
-- `GET /health` boleh tanpa auth pada network internal.
-- Endpoint lain wajib authenticated.
-- Production send API tidak boleh anonymous/public.
+`GET /health` boleh unauthenticated pada internal network.
 
-Baseline header:
-
+Endpoint lain wajib:
 ```http
 Authorization: Bearer <internal-api-token>
 Content-Type: application/json
 ```
 
-Nilai token tidak pernah ditulis ke Git.
+Token/secret tidak pernah masuk Git atau response.
 
-### Response Semantics
-HTTP success create-job berarti **job diterima**, bukan WhatsApp delivery sudah sukses.
+## 2. Tenant Rule
 
-Delivery sukses ditentukan oleh status asynchronous:
-- `PENDING`
-- `PREPARING`
-- `SENDING`
-- `SENT`
-- `FAILED`
-- `RETRY_PENDING`
-- `FAILED_FINAL`
-
-### Tenant Boundary
-Request business wajib membawa `tenantId`.
+Semua session/send operation terikat tenant.
 
 Pilot:
 `jember`
 
-### Idempotency
-Create invitation wajib membawa `idempotencyKey`.
+Rules:
+- device/session belongs to tenant;
+- cross-tenant access rejected;
+- satu default device per tenant baseline;
+- future multi-device allowed.
 
-Request dengan key sama tidak boleh membuat logical invitation kedua.
+## 3. GET /health
 
----
-
-## 2. GET /health
-
-Purpose:
-- liveness/readiness baseline.
-
-Example response:
-
+Example:
 ```json
 {
   "status": "ok",
   "service": "redhub-wa-gateway",
-  "version": "0.1.0",
-  "database": "ok"
+  "version": "0.1.0"
 }
 ```
 
-Health tidak menampilkan secret/session detail.
+Health tidak menampilkan secret/session credential.
 
----
+## 4. Session / Device API
 
-## 3. GET /api/v1/devices
+Implementation boleh mempertahankan device-centric route yang sudah dibangun pada WA-002 selama semantics berikut tersedia:
 
-Purpose:
-- daftar device sesuai tenant/authorization.
-
-Query:
-- `tenantId`
+### Create/register logical device
+`POST /api/v1/devices`
 
 Example:
-
-```json
-{
-  "items": [
-    {
-      "id": "dev_jember_main",
-      "tenantId": "jember",
-      "name": "WhatsApp Utama Jember",
-      "phone": "628xxxxxxxxxx",
-      "provider": "baileys",
-      "status": "CONNECTED",
-      "isDefault": true,
-      "lastConnectedAt": "2026-10-04T01:00:00.000Z"
-    }
-  ]
-}
-```
-
-Status device baseline:
-- `DISCONNECTED`
-- `PAIRING`
-- `CONNECTING`
-- `CONNECTED`
-- `ERROR`
-
----
-
-## 4. POST /api/v1/devices
-
-Purpose:
-- membuat logical WhatsApp device.
-
-Example request:
-
 ```json
 {
   "tenantId": "jember",
@@ -118,367 +61,196 @@ Example request:
 }
 ```
 
-Tidak memasukkan raw session credential pada API response.
+### Start pairing
+`POST /api/v1/devices/:deviceId/pair`
 
----
+### Pairing state
+`GET /api/v1/devices/:deviceId/pairing`
 
-## 5. POST /api/v1/devices/:deviceId/pair
+### Device status
+`GET /api/v1/devices/:deviceId/status`
 
-Purpose:
-- memulai/refresh pairing flow untuk device authorized.
+### Logout/disconnect
+`POST /api/v1/devices/:deviceId/logout`
 
-Example response:
+Baseline status:
+- `DISCONNECTED`
+- `CONNECTING`
+- `PAIRING`
+- `CONNECTED`
+- `ERROR`
 
-```json
-{
-  "deviceId": "dev_jember_main",
-  "status": "PAIRING",
-  "pairingMode": "QR"
-}
-```
+QR:
+- protected;
+- short-lived;
+- never emitted to normal logs;
+- tenant ownership validated.
 
-QR data diambil melalui endpoint pairing state yang protected.
-
----
-
-## 6. GET /api/v1/devices/:deviceId/pairing
-
-Purpose:
-- membaca pairing state secara aman.
-
-Example response:
-
-```json
-{
-  "deviceId": "dev_jember_main",
-  "status": "PAIRING",
-  "qr": "<short-lived-qr-payload>",
-  "expiresAt": "2026-10-04T01:02:00.000Z"
-}
-```
-
-Rules:
-- protected endpoint;
-- QR short-lived;
-- jangan log full QR payload;
-- tenant ownership wajib divalidasi.
-
----
-
-## 7. GET /api/v1/devices/:deviceId/status
-
-Example:
-
-```json
-{
-  "deviceId": "dev_jember_main",
-  "tenantId": "jember",
-  "status": "CONNECTED",
-  "phone": "628xxxxxxxxxx",
-  "lastConnectedAt": "2026-10-04T01:00:00.000Z"
-}
-```
-
----
-
-## 8. POST /api/v1/invitations
+## 5. POST /api/v1/messages/text
 
 Purpose:
-- membuat asynchronous invitation job.
+mengirim satu pesan text yang sudah disiapkan oleh backend RedHub.
 
 ### Request
-
 ```json
 {
   "tenantId": "jember",
   "deviceId": "dev_jember_main",
-  "meetingId": "MTG-2026-001",
-  "memberId": "MBR-001",
-  "invitationType": "MEETING",
-  "phone": "628123456789",
-  "recipientName": "Bambang Irawan",
-  "agenda": "TEST UPACARA",
-  "date": "Selasa, 13 Oktober 2026",
-  "time": "13.00",
-  "location": "PANTI",
-  "pdfUrl": "https://redhub.example/files/invitations/MTG-2026-001.pdf",
-  "pdfFilename": "Undangan_TEST_UPACARA_13_Oktober_2026.pdf",
-  "organizationName": "Sekretariat DPC PDI Perjuangan Kabupaten Jember",
-  "idempotencyKey": "jember:MTG-2026-001:MBR-001:MEETING"
+  "to": "628123456789",
+  "text": "Undangan rapat...",
+  "requestId": "rh-req-001"
 }
 ```
 
-`deviceId` dapat dibuat optional pada implementasi jika tenant hanya memakai default device, tetapi resolved device harus disimpan ke job.
+`deviceId` boleh optional jika tenant mempunyai exactly one default device.
 
-### Validation Minimum
+`requestId` adalah correlation ID untuk tracing. Gateway tidak mengambil alih business idempotency backend.
 
-- tenant exists/active;
-- device belongs to tenant;
-- phone valid/normalized;
-- recipientName non-empty;
-- meetingId/memberId present;
-- agenda/date/time/location present;
-- PDF source accepted;
-- PDF filename safe;
-- idempotencyKey non-empty;
-- payload size bounded.
-
-### Accepted Response
-
-```json
-{
-  "messageId": "wam_01...",
-  "status": "PENDING",
-  "duplicate": false,
-  "idempotencyKey": "jember:MTG-2026-001:MBR-001:MEETING"
-}
-```
-
-### Duplicate Response
-
-Jika request dengan idempotency key sama sudah ada:
-
-```json
-{
-  "messageId": "wam_01...",
-  "status": "SENT",
-  "duplicate": true,
-  "idempotencyKey": "jember:MTG-2026-001:MBR-001:MEETING"
-}
-```
-
-Gateway mengembalikan logical job existing dan tidak membuat pengiriman baru.
-
----
-
-## 9. Rendered Invitation Baseline
-
-Gateway harus menghasilkan baseline:
-
-```text
-*UNDANGAN RAPAT / KEGIATAN*
-
-Yth. *Bpk/Ibu Bambang Irawan*,
-
-*Merdeka...!!*
-
-Dengan hormat, kami menyampaikan undangan untuk menghadiri agenda berikut:
-
-*📌 Agenda: TEST UPACARA*
-*📅 Waktu: Selasa, 13 Oktober 2026*
-*⏰ Pukul: 13.00 WIB*
-*📍 Tempat: PANTI*
-
-Undangan resmi terlampir pada pesan ini.
-
-Mohon hadir tepat waktu sesuai jadwal yang telah ditetapkan.
-
-Terima kasih atas perhatian dan kehadirannya.
-
-*Merdeka...!!*
-
-*Sekretariat DPC PDI Perjuangan Kabupaten Jember*
-
-_Pesan otomatis RedHub. Mohon tidak membalas pesan ini. Untuk informasi lebih lanjut, hubungi Sekretariat._
-```
-
-Renderer tidak boleh mengizinkan tenant A memakai organization identity tenant B.
-
----
-
-## 10. PDF Delivery Contract
-
-Expected provider behavior:
-- download/read source PDF;
-- verify file available;
-- validate content/type/size;
-- sanitize filename;
-- send as WhatsApp document;
-- include appropriate text/caption strategy based on provider capability;
-- remove temporary file/buffer after completion.
-
-Jika provider caption limitation membuat full template tidak stabil, gateway boleh mengirim:
-1. invitation text;
-2. PDF document immediately after;
-
-tetapi keduanya tetap satu logical invitation job dan status akhir hanya SENT jika required delivery operations berhasil sesuai implementation policy.
-
----
-
-## 11. GET /api/v1/messages/:messageId
-
-Example:
-
-```json
-{
-  "id": "wam_01...",
-  "tenantId": "jember",
-  "deviceId": "dev_jember_main",
-  "meetingId": "MTG-2026-001",
-  "memberId": "MBR-001",
-  "status": "SENT",
-  "attemptCount": 1,
-  "providerMessageId": "provider-id",
-  "queuedAt": "2026-10-04T01:00:00.000Z",
-  "sentAt": "2026-10-04T01:00:04.000Z",
-  "lastError": null
-}
-```
-
-Sensitive provider/session data tidak ditampilkan.
-
----
-
-## 12. GET /api/v1/messages
-
-Filters baseline:
-- `tenantId`
-- `meetingId`
-- `memberId`
-- `status`
-- pagination
-
-Phone pada response admin dapat dimasking.
-
----
-
-## 13. POST /api/v1/messages/:messageId/retry
-
-Purpose:
-- manual controlled retry untuk message yang eligible.
-
-Rules:
-- hanya status failure yang eligible;
-- respect max attempt;
-- tidak boleh retry SENT;
-- attempt baru tercatat;
-- authorization tenant wajib.
-
-Example response:
-
-```json
-{
-  "messageId": "wam_01...",
-  "status": "RETRY_PENDING",
-  "attemptCount": 1
-}
-```
-
----
-
-## 14. GET /api/v1/queue/summary
-
-Purpose:
-- monitoring sederhana.
-
-Example:
-
-```json
-{
-  "tenantId": "jember",
-  "pending": 12,
-  "preparing": 0,
-  "sending": 1,
-  "sent": 87,
-  "failed": 0,
-  "retryPending": 0
-}
-```
-
----
-
-## 15. POST /api/v1/test-send
-
-Purpose:
-- controlled admin/developer validation sebelum RedHub integration.
-
-V1 test-send dapat menerima:
-- tenant/device;
-- destination phone;
-- text;
-- optional safe PDF source.
-
-Endpoint:
+### Validation
 - authenticated;
-- disabled/restricted in production if no longer needed;
-- audit logged.
+- tenant active/known;
+- device belongs to tenant;
+- device CONNECTED;
+- phone normalized/valid;
+- text non-empty;
+- bounded payload size.
 
-Tidak boleh menjadi anonymous arbitrary-send endpoint.
-
----
-
-## 16. Error Shape
-
-Baseline:
-
+### Success
 ```json
 {
+  "success": true,
+  "tenantId": "jember",
+  "deviceId": "dev_jember_main",
+  "providerMessageId": "provider-message-id",
+  "requestId": "rh-req-001"
+}
+```
+
+### Failure
+```json
+{
+  "success": false,
+  "requestId": "rh-req-001",
   "error": {
-    "code": "INVALID_PHONE",
-    "message": "Nomor tujuan tidak valid",
-    "requestId": "req_01..."
+    "code": "DEVICE_NOT_CONNECTED",
+    "message": "WhatsApp device is not connected"
   }
 }
 ```
 
-Suggested safe codes:
+Raw provider stack/credential tidak dikirim ke client.
+
+## 6. POST /api/v1/messages/document
+
+Purpose:
+mengirim satu PDF/document yang sudah ditentukan backend RedHub.
+
+### Request
+```json
+{
+  "tenantId": "jember",
+  "deviceId": "dev_jember_main",
+  "to": "628123456789",
+  "documentUrl": "https://redhub.example/files/undangan.pdf",
+  "filename": "Undangan_Rapat.pdf",
+  "caption": "Undangan resmi terlampir.",
+  "requestId": "rh-req-002"
+}
+```
+
+### Gateway behavior
+1. validate tenant/device/recipient;
+2. fetch/read source safely;
+3. enforce allowed content type and size;
+4. sanitize filename;
+5. send as WhatsApp document;
+6. return provider result;
+7. remove temporary data.
+
+Gateway tidak menyimpan PDF sebagai permanent archive.
+
+### Success
+```json
+{
+  "success": true,
+  "tenantId": "jember",
+  "deviceId": "dev_jember_main",
+  "providerMessageId": "provider-message-id",
+  "requestId": "rh-req-002"
+}
+```
+
+## 7. Optional Minimal Delivery Log
+
+Gateway boleh menyimpan operational delivery record:
+- requestId;
+- tenantId;
+- deviceId;
+- masked destination;
+- type TEXT/DOCUMENT;
+- providerMessageId;
+- result SENT/FAILED;
+- safe error code;
+- timestamp.
+
+Tidak menyimpan campaign/meeting business state sebagai source of truth.
+
+## 8. Error Codes Baseline
+
 - `UNAUTHORIZED`
 - `FORBIDDEN`
 - `TENANT_NOT_FOUND`
 - `DEVICE_NOT_FOUND`
 - `DEVICE_NOT_CONNECTED`
 - `INVALID_PHONE`
-- `INVALID_PDF_SOURCE`
-- `PDF_TOO_LARGE`
-- `DUPLICATE_REQUEST` only if implementation chooses conflict instead of existing-job response
-- `QUEUE_ERROR`
+- `INVALID_TEXT`
+- `INVALID_DOCUMENT_SOURCE`
+- `DOCUMENT_TOO_LARGE`
+- `UNSUPPORTED_DOCUMENT_TYPE`
 - `PROVIDER_ERROR`
-- `RETRY_NOT_ALLOWED`
+- `INTERNAL_ERROR`
 
-Raw credential/provider stack trace tidak dikirim ke client production.
+## 9. Explicit Non-Contract / Non-Scope
 
----
+Tidak ada requirement gateway V1 untuk:
+- `POST /invitations` business endpoint;
+- campaign creation;
+- campaign queue summary;
+- H-1 scheduler;
+- participant selection;
+- meeting template rendering;
+- campaign retry worker;
+- business idempotency engine.
 
-## 17. Future RedHub Backend Mapping
+Backend RedHub menangani hal tersebut lalu memanggil text/document delivery endpoint.
 
-Setelah WA-010 PASS/LOCKED:
+## 10. End-to-End Responsibility
 
 ```text
-RedHub meeting
-  + participant
-  + tenant
-  + official invitation PDF
-        |
-        v
-RedHub backend constructs request
-        |
-        v
-POST /api/v1/invitations
-        |
-        v
-Gateway returns messageId/PENDING
-        |
-        v
-RedHub stores/reads delivery reference
+RedHub Backend
+  decides:
+    tenant
+    recipient
+    schedule
+    H-1 timing
+    text/caption
+    PDF URL
+  |
+  v
+WA Gateway
+  resolves tenant WA session
+  sends delivery
+  returns provider result
+  |
+  v
+WhatsApp
 ```
 
-Frontend RedHub tidak memanggil gateway send endpoint langsung.
+## 11. Breaking Changes
 
----
-
-## 18. Non-Contract Internal Details
-
-Hal berikut boleh berubah tanpa memutus client selama contract tetap kompatibel:
-- internal folder layout;
-- ORM/query builder;
-- worker implementation;
-- exact database indexes;
-- provider library minor version;
-- internal temp file strategy;
-- logging library.
-
-Perubahan breaking API harus:
+Perubahan breaking harus:
 1. dicatat di DECISIONS;
-2. update contract;
-3. memiliki migration/client plan;
-4. tidak dilakukan diam-diam.
+2. update API contract;
+3. update checkpoint;
+4. memiliki client migration plan;
+5. tidak dilakukan diam-diam.
