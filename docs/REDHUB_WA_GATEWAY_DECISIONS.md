@@ -293,3 +293,19 @@ Reason:
 WA-001 foundation may be locked using an isolated Docker CI runner when it validates the same Docker Compose build/start/health/migration/restart behavior without touching production.
 
 For WA-002 and later checkpoints that require a real WhatsApp account/QR/session, real device validation is mandatory and CI simulation is not a substitute.
+
+
+## RHWA-D-035 — WA-002 Baileys Version Pin
+WA-002 uses `baileys@7.0.0-rc14` as the initial pinned provider version because the repository already had compatibility with this API shape.
+
+Do not silently upgrade the provider version during the pairing checkpoint. Upgrade only after regression tests and a recorded decision.
+
+## RHWA-D-036 — Protected QR Access
+QR pairing data is sensitive short-lived operational state.
+
+Rules:
+- no QR in normal application logs;
+- JSON QR endpoint requires internal bearer auth;
+- PNG QR endpoint requires internal bearer auth;
+- QR endpoint is for pairing only and returns 404 when no active QR exists;
+- production UI integration is deferred; WA-002 testing may save the authenticated PNG response locally for scanning.
