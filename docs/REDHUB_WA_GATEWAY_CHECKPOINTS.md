@@ -683,15 +683,38 @@ Local verification:
 - backup verification was non-destructive;
 - existing local WhatsApp session remained CONNECTED.
 
-### VPS Access Preflight
-- TCP port 22 on `202.10.36.74`: OPEN;
-- existing local SSH keys `redhub_deploy_ed25519` and `kurirobat_vps_ed25519` were tested read-only against the new VPS;
-- neither key is currently authorized on the new VPS;
-- no command was executed on the old VPS.
+### Production Deployment Progress -- 2026-10-05
+- trusted ED25519 SSH key authorized for `root@202.10.36.74`;
+- SSH access verified as `root` on host `redvote.id`;
+- existing production services audited before deployment;
+- existing `nginx` and `redhub-hybrid.service` remained active and were not reconfigured;
+- existing RedHub hybrid service remains on `127.0.0.1:8787` behind Nginx;
+- Docker Engine `27.5.1` and Docker Compose `2.33.1` installed;
+- WA Gateway source deployed to `/opt/redhub-wa-gateway` from verified branch `feat/redhub-wa-009-vps-deploy` at commit `4dfbb700a84e712691408bebd08c7603dcd15cbb`;
+- WA-009 preflight: PASS;
+- production `.env` created on VPS with new strong secrets; secrets were not printed or committed;
+- `DOCUMENT_ALLOWED_HOSTS` left empty for production baseline;
+- PostgreSQL container healthy with no published host port;
+- gateway container healthy on `127.0.0.1:3410` only;
+- `GET /health` -> HTTP 200 / database `ok`;
+- production WhatsApp device `jember/jember-main` paired successfully;
+- device reached `CONNECTED`, `HAS_QR=false`;
+- gateway container restart returned automatically to `CONNECTED` without a new QR;
+- production session `creds.json` mode verified `600`;
+- gateway container identity verified non-root `app`;
+- sensitive-log scan: PASS;
+- production session + PostgreSQL backup created;
+- non-destructive backup verification: `BACKUP_VERIFY=PASS`;
+- controlled production text request -> HTTP 200 / provider message ID returned / delivery log `SENT`;
+- controlled production PDF request -> HTTP 200 / provider message ID returned / delivery log `SENT`;
+- existing `nginx` and `redhub-hybrid.service` remained active after deployment and restart tests;
+- old VPS `202.10.45.147` was not touched.
 
-**Current deployment blocker:** authorize a trusted SSH key or otherwise provide one-time authenticated shell access to `root@202.10.36.74`.
+### Remaining WA-009 Exit Gates
+- user-visible receipt confirmation for the controlled production text and PDF;
+- VPS reboot persistence gate, followed by health/session/existing-service verification.
 
-This is an access blocker only; WA-009 remains IN PROGRESS and no production change has yet been made.
+WA-009 remains **IN PROGRESS** until those final gates pass.
 
 ### Required
 - Docker + Compose;

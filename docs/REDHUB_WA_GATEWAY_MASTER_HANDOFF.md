@@ -243,12 +243,27 @@ Non-sending smoke against the real local gateway passes health, tenant mapping, 
 
 WA-008 may only be locked after the actual RedHub backend is accessible and verified to call text/PDF delivery while keeping broadcast/reminder H-1 orchestration in RedHub.
 
-### WA-009 — VPS Deployment
-**IN PROGRESS — standalone gateway deployment explicitly approved while WA-008 is deferred.**
+### WA-009 - VPS Deployment
+**IN PROGRESS - standalone gateway deployed and paired; final exit gates pending.**
 
-Deploy ke `202.10.36.74`, persistent volume, firewall/private networking, restart test, backup baseline. VPS lama `202.10.45.147` tidak boleh disentuh.
+Production state:
+- deployed on `202.10.36.74` from verified WA-009 branch/commit;
+- Docker + Compose active;
+- gateway healthy on loopback-only `127.0.0.1:3410`;
+- PostgreSQL healthy with no published host port;
+- production WhatsApp session `jember/jember-main` is CONNECTED;
+- session survives gateway container restart without QR;
+- production backup + non-destructive verification PASS;
+- controlled production text and PDF API sends returned HTTP 200/provider IDs and delivery logs SENT;
+- sensitive-log scan and session permission checks PASS;
+- existing Nginx and `redhub-hybrid.service` remain active;
+- old VPS `202.10.45.147` was not touched.
 
-### WA-010 — Production End-to-End
+Remaining before WA-009 lock:
+- user-visible receipt confirmation for production text + PDF;
+- VPS reboot persistence gate and post-reboot verification.
+
+### WA-010 - Production End-to-End
 RedHub backend -> gateway -> WhatsApp untuk text/PDF serta reminder H-1 yang **dipicu oleh RedHub backend**.
 
 ## 12. Current Position
@@ -257,7 +272,7 @@ RedHub backend -> gateway -> WhatsApp untuk text/PDF serta reminder H-1 yang **d
 **DEFERRED:** WA-008 — Local RedHub Contract Validation (actual RedHub backend unavailable)  
 **IN PROGRESS:** WA-009 — Production Deployment  
 **WA-010:** blocked until WA-008 actual RedHub integration is completed  
-**PRODUCTION:** deployment in progress  
+**PRODUCTION:** gateway deployed, paired, healthy; final WA-009 exit gates pending
 **TARGET VPS:** 202.10.36.74
 
 ## 13. Handoff Rule
