@@ -1,155 +1,186 @@
 # REDHUB WA Gateway — API Contract V1
 
-> Revised **2026-10-05**.
-> Gateway adalah simple multi-tenant delivery layer. Broadcast, reminder H-1, scheduling, recipient selection, dan business retry berada di backend RedHub.
+> Revised **2026-10-05** through **WA-005 PASS / LOCKED**.
+> Gateway is a simple multi-tenant WhatsApp delivery layer. Broadcast, reminder H-1, scheduling, recipient selection, and business retry remain in the RedHub backend.
 
 Base path:
 `/api/v1`
 
 ## 1. Authentication
 
-`GET /health` boleh unauthenticated pada internal network.
+`GET /health` is unauthenticated on the internal/local network.
 
-Endpoint lain wajib:
+All `/api/v1/*` endpoints require:
+
 ```http
 Authorization: Bearer <internal-api-token>
 Content-Type: application/json
 ```
 
-Token/secret tidak pernah masuk Git atau response.
+Secrets, session credentials, and provider key material must never appear in Git, API responses, or normal logs.
 
-## 2. Tenant Rule
+## 2. Tenant and Device Identity
 
-Semua session/send operation terikat tenant.
-
-Pilot:
-`jember`
+Every device and send operation belongs to a tenant.
 
 Rules:
-- device/session belongs to tenant;
-- cross-tenant access rejected;
-- satu default device per tenant baseline;
-- future multi-device allowed.
+- `tenantId` is mandatory for tenant-scoped device operations;
+- runtime identity is the pair `tenantId + deviceId`;
+- the same `deviceId` may exist under different tenants;
+- tenant A must not access tenant B device/session;
+- session path is `SESSION_DIR/<tenantId>/<deviceId>/`;
+- persisted tenant sessions are restored on gateway startup;
+- default tenant/device values come from environment, not a Jember hard-code.
+
+### Implicit default device
+
+For text/document delivery:
+- if a tenant has exactly one runtime device, `deviceId` may be omitted and that device is used as the implicit default;
+- if a tenant has more than one device and `deviceId` is omitted, gateway returns `DEVICE_REQUIRED`;
+- if an explicit device belongs to another tenant, gateway returns `DEVICE_TENANT_MISMATCH`.
 
 ## 3. GET /health
 
-Example:
+Example response:
+
 ```json
 {
   "status": "ok",
   "service": "redhub-wa-gateway",
-  "version": "0.1.0"
+  "version": "0.1.0",
+  "database": "ok"
 }
 ```
 
-Health tidak menampilkan secret/session credential.
+## 4. Device / Session API
 
-## 4. Session / Device API
+### Start or pair a device
 
-Implementation boleh mempertahankan device-centric route yang sudah dibangun pada WA-002 selama semantics berikut tersedia:
+`POST /api/v1/devices/:deviceId/pair`
 
-### Create/register logical device
-`POST /api/v1/devices`
+Request:
 
-Example:
+```json
+{
+  "tenantId": "jember"
+}
+```
+
+The endpoint starts the tenant-scoped device. If credentials do not yet represent a linked account, status progresses to `PAIRING` and QR becomes available.
+
+### List devices for one tenant
+
+`GET /api/v1/devices?tenantId=<tenantId>`
+
+Example response:
+
 ```json
 {
   "tenantId": "jember",
-  "name": "WhatsApp Utama Jember",
-  "provider": "baileys",
-  "isDefault": true
+  "devices": [
+    {
+      "deviceId": "jember-main",
+      "tenantId": "jember",
+      "provider": "baileys",
+      "status": "CONNECTED",
+      "hasQr": false
+    }
+  ]
 }
 ```
 
-### Start pairing
-`POST /api/v1/devices/:deviceId/pair`
-
-### Pairing state
-`GET /api/v1/devices/:deviceId/pairing`
-
 ### Device status
-`GET /api/v1/devices/:deviceId/status`
 
-### Logout/disconnect
-`POST /api/v1/devices/:deviceId/logout`
+`GET /api/v1/devices/:deviceId/status?tenantId=<tenantId>`
 
-Baseline status:
+### Pairing state as JSON
+
+`GET /api/v1/devices/:deviceId/pairing?tenantId=<tenantId>`
+
+### Pairing QR as PNG
+
+`GET /api/v1/devices/:deviceId/pairing.png?tenantId=<tenantId>`
+
+Baseline device status:
 - `DISCONNECTED`
 - `CONNECTING`
 - `PAIRING`
 - `CONNECTED`
 - `ERROR`
 
-QR:
-- protected;
+QR rules:
+- bearer-auth protected;
+- tenant-scoped;
 - short-lived;
-- never emitted to normal logs;
-- tenant ownership validated.
+- not written to normal logs;
+- returns unavailable when no active QR exists.
+
+A logout/delete-session API is **not part of the implemented WA-005 contract yet**.
 
 ## 5. POST /api/v1/messages/text
 
-Purpose:
-mengirim satu pesan text yang sudah disiapkan oleh backend RedHub.
+Purpose: send one ready-to-deliver text message supplied by RedHub backend.
 
-### Request
+Request with explicit device:
+
 ```json
 {
   "tenantId": "jember",
-  "deviceId": "dev_jember_main",
+  "deviceId": "jember-main",
   "to": "628123456789",
   "text": "Undangan rapat...",
   "requestId": "rh-req-001"
 }
 ```
 
-`deviceId` boleh optional jika tenant mempunyai exactly one default device.
+For a tenant with exactly one device, `deviceId` may be omitted.
 
-`requestId` adalah correlation ID untuk tracing. Gateway tidak mengambil alih business idempotency backend.
+Validation:
+- authenticated request;
+- tenant/device ownership;
+- connected device;
+- destination normalization/validation;
+- non-empty text;
+- text length limit.
 
-### Validation
-- authenticated;
-- tenant active/known;
-- device belongs to tenant;
-- device CONNECTED;
-- phone normalized/valid;
-- text non-empty;
-- bounded payload size.
+Success:
 
-### Success
 ```json
 {
   "success": true,
   "tenantId": "jember",
-  "deviceId": "dev_jember_main",
+  "deviceId": "jember-main",
+  "to": "628123456789",
   "providerMessageId": "provider-message-id",
   "requestId": "rh-req-001"
 }
 ```
 
-### Failure
+Failure example:
+
 ```json
 {
   "success": false,
   "requestId": "rh-req-001",
   "error": {
     "code": "DEVICE_NOT_CONNECTED",
-    "message": "WhatsApp device is not connected"
+    "message": "Unable to send WhatsApp text message"
   }
 }
 ```
 
-Raw provider stack/credential tidak dikirim ke client.
+Raw provider stack/credential must not be returned.
 
 ## 6. POST /api/v1/messages/document
 
-Purpose:
-mengirim satu PDF/document yang sudah ditentukan backend RedHub.
+Purpose: send one PDF document determined by RedHub backend.
 
-### Request
+Request:
+
 ```json
 {
   "tenantId": "jember",
-  "deviceId": "dev_jember_main",
+  "deviceId": "jember-main",
   "to": "628123456789",
   "documentUrl": "https://redhub.example/files/undangan.pdf",
   "filename": "Undangan_Rapat.pdf",
@@ -158,99 +189,131 @@ mengirim satu PDF/document yang sudah ditentukan backend RedHub.
 }
 ```
 
-### Gateway behavior
-1. validate tenant/device/recipient;
-2. fetch/read source safely;
-3. enforce allowed content type and size;
-4. sanitize filename;
-5. send as WhatsApp document;
-6. return provider result;
-7. remove temporary data.
+For a tenant with exactly one device, `deviceId` may be omitted.
 
-Gateway tidak menyimpan PDF sebagai permanent archive.
+Gateway behavior:
+1. validate tenant/device ownership before document fetch when an explicit device is supplied;
+2. require HTTP/HTTPS URL;
+3. fetch as a streamed response;
+4. require `application/pdf`;
+5. reject over 10 MB, including early cancellation when stream exceeds the limit;
+6. verify PDF magic `%PDF-`;
+7. sanitize filename and add `.pdf` when necessary;
+8. validate optional caption length;
+9. keep the PDF in memory only;
+10. send as WhatsApp document with `application/pdf`;
+11. return provider result.
 
-### Success
+The gateway is not a permanent document archive.
+
+Success:
+
 ```json
 {
   "success": true,
   "tenantId": "jember",
-  "deviceId": "dev_jember_main",
+  "deviceId": "jember-main",
+  "to": "628123456789",
+  "filename": "Undangan_Rapat.pdf",
   "providerMessageId": "provider-message-id",
   "requestId": "rh-req-002"
 }
 ```
 
-## 7. Optional Minimal Delivery Log
+## 7. Session Persistence
 
-Gateway boleh menyimpan operational delivery record:
+Current storage:
+
+```text
+SESSION_DIR/
+  tenant-a/
+    device-main/
+      creds.json
+      ...
+  tenant-b/
+    device-main/
+      creds.json
+      ...
+```
+
+Rules:
+- session credentials live in persistent Docker storage;
+- session credentials never enter Git;
+- WA-005 migrates the previous legacy single-level session path into the tenant/device layout;
+- persisted tenant sessions are discovered and started during gateway startup;
+- a valid paired session must reconnect without a new QR after container restart.
+
+## 8. Correlation and Delivery Logging
+
+`requestId` is a correlation ID supplied by RedHub and returned by the delivery response.
+
+Persistent/minimal delivery logging is the scope of **WA-006**.
+
+WA-006 baseline fields:
 - requestId;
 - tenantId;
 - deviceId;
-- masked destination;
 - type TEXT/DOCUMENT;
+- masked destination;
 - providerMessageId;
 - result SENT/FAILED;
-- safe error code;
+- safe error code/message;
 - timestamp.
 
-Tidak menyimpan campaign/meeting business state sebagai source of truth.
+No campaign queue/scheduler is added by WA-006.
 
-## 8. Error Codes Baseline
+## 9. Error Codes Baseline
 
+Implemented/currently expected:
 - `UNAUTHORIZED`
-- `FORBIDDEN`
-- `TENANT_NOT_FOUND`
+- `TENANT_REQUIRED`
 - `DEVICE_NOT_FOUND`
+- `DEVICE_TENANT_MISMATCH`
+- `DEVICE_REQUIRED`
 - `DEVICE_NOT_CONNECTED`
 - `INVALID_PHONE`
 - `INVALID_TEXT`
+- `INVALID_REQUEST`
 - `INVALID_DOCUMENT_SOURCE`
+- `INVALID_DOCUMENT_FILENAME`
+- `INVALID_DOCUMENT_CAPTION`
 - `DOCUMENT_TOO_LARGE`
 - `UNSUPPORTED_DOCUMENT_TYPE`
 - `PROVIDER_ERROR`
-- `INTERNAL_ERROR`
 
-## 9. Explicit Non-Contract / Non-Scope
+Provider internals and stack traces must not be returned to clients.
 
-Tidak ada requirement gateway V1 untuk:
-- `POST /invitations` business endpoint;
+## 10. Explicit Non-Scope
+
+Gateway V1 does not own:
 - campaign creation;
-- campaign queue summary;
-- H-1 scheduler;
-- participant selection;
-- meeting template rendering;
+- broadcast scheduling;
+- H-1 scheduling;
+- recipient segmentation;
+- meeting/business template rendering;
 - campaign retry worker;
-- business idempotency engine.
+- business idempotency/duplicate policy;
+- CRM/chatbot/inbox.
 
-Backend RedHub menangani hal tersebut lalu memanggil text/document delivery endpoint.
-
-## 10. End-to-End Responsibility
+Responsibility remains:
 
 ```text
 RedHub Backend
-  decides:
-    tenant
-    recipient
-    schedule
-    H-1 timing
-    text/caption
-    PDF URL
-  |
-  v
+  decides tenant / recipient / schedule / H-1 timing / text / PDF URL
+        |
+        v
 WA Gateway
-  resolves tenant WA session
-  sends delivery
-  returns provider result
-  |
-  v
+  resolves tenant session -> sends -> returns provider result
+        |
+        v
 WhatsApp
 ```
 
 ## 11. Breaking Changes
 
-Perubahan breaking harus:
-1. dicatat di DECISIONS;
-2. update API contract;
-3. update checkpoint;
-4. memiliki client migration plan;
-5. tidak dilakukan diam-diam.
+Any breaking API change must:
+1. be recorded in Decisions;
+2. update this contract;
+3. update Checkpoints;
+4. include a RedHub client migration plan;
+5. never be introduced silently.

@@ -97,9 +97,13 @@ Tenant Bondowoso   -> WA Device/Session Bondowoso
 Rules:
 - request selalu terkait tenant;
 - device/session punya ownership tenant;
-- satu tenant memiliki default device;
-- future multi-device diperbolehkan;
+- session path: `SESSION_DIR/<tenantId>/<deviceId>/`;
+- satu-device tenant menjadi implicit default bila `deviceId` tidak dikirim;
+- bila tenant memiliki >1 device, `deviceId` wajib eksplisit;
+- device ID yang sama boleh ada pada tenant berbeda;
+- persisted tenant sessions dipulihkan saat startup;
 - tenant A dilarang memakai session tenant B;
+- tenant/device default berasal dari environment, bukan hard-code core;
 - organization/business logic tidak ditanam ke gateway.
 
 ## 6. API Capability Baseline
@@ -199,28 +203,20 @@ Explicit scope revision:
 - queue/campaign/retry business engine di gateway dibatalkan dari V1.
 
 ### WA-002 — WhatsApp Device & Persistent Session
-**IN PROGRESS**
-Real pairing/restart/reconnect gate.
+**PASS / LOCKED**
+Real pairing, persistent session, restart/reconnect, and log hygiene verified.
 
 ### WA-003 — Text Delivery API
-- normalized destination;
-- tenant/device resolve;
-- send text;
-- return provider result/error;
-- real-message verification.
+**PASS / LOCKED**
+Real text delivery and provider result/error contract verified.
 
 ### WA-004 — PDF/Document Delivery API
-- fetch/validate PDF;
-- send document;
-- filename/caption;
-- temp cleanup;
-- real-document verification.
+**PASS / LOCKED**
+Real PDF document delivery, filename/caption, source guards, and cleanup verified.
 
 ### WA-005 — Multi-Tenant Isolation
-- tenant registry/device ownership;
-- default device per tenant;
-- isolation tests;
-- multiple active sessions foundation.
+**PASS / LOCKED**
+Tenant-scoped runtime registry/session paths, legacy session migration, implicit single-device default, future multi-device semantics, and cross-tenant rejection verified.
 
 ### WA-006 — Minimal Delivery Log & Error Contract
 - correlation/request ID;
@@ -247,9 +243,9 @@ RedHub backend -> gateway -> WhatsApp untuk text/PDF serta reminder H-1 yang **d
 
 ## 12. Current Position
 
-**LAST PASS / LOCKED:** WA-002 — WhatsApp Device & Persistent Session  
+**LAST PASS / LOCKED:** WA-005 — Multi-Tenant Isolation  
 **IN PROGRESS:** none  
-**NEXT:** WA-003 — Text Delivery API  
+**NEXT:** WA-006 — Minimal Delivery Log & Error Contract  
 **PRODUCTION:** belum  
 **TARGET VPS:** 202.10.36.74
 

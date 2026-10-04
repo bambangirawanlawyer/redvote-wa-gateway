@@ -81,10 +81,13 @@ Jika reliability minimum dibutuhkan di gateway, implementasinya harus tetap keci
 Gateway tetap multi-tenant.
 
 Baseline:
-- satu tenant memiliki satu default WhatsApp device/session;
-- future dapat lebih dari satu device;
+- session disimpan per tenant/device: `SESSION_DIR/<tenantId>/<deviceId>/`;
+- satu-device tenant menjadi implicit default bila `deviceId` tidak dikirim;
+- jika tenant memiliki >1 device, `deviceId` wajib eksplisit;
+- nama device yang sama boleh dipakai tenant berbeda tanpa collision;
 - session/device tenant A tidak boleh dipakai tenant B;
-- pilot pertama: Jember.
+- tenant/device default berasal dari environment, bukan hard-code core;
+- pilot pertama tetap Jember.
 
 ## Development Strategy
 
@@ -109,7 +112,10 @@ VPS lama `202.10.45.147` tidak disentuh kecuali ada instruksi eksplisit.
 - WA-001 — Local Docker Foundation — PASS / LOCKED
 - WA-001A — Scope Simplification: RedHub Owns Broadcast/Reminder — PASS / LOCKED
 - WA-002 — WhatsApp Device & Persistent Session — PASS / LOCKED
-- WA-003 — Text Delivery API — NEXT
+- WA-003 — Text Delivery API — PASS / LOCKED
+- WA-004 — PDF / Document Delivery API — PASS / LOCKED
+- WA-005 — Multi-Tenant Isolation — PASS / LOCKED
+- WA-006 — Minimal Delivery Log & Error Contract — NEXT
 - Production deploy — NOT STARTED
 
 ## Mandatory Workflow
@@ -128,11 +134,13 @@ Tidak boleh mengklaim PASS tanpa verifikasi.
 
 ## Next Action
 
-Kerjakan **WA-003 — Text Delivery API** di local:
-- endpoint `POST /api/v1/messages/text`;
-- resolve tenant/device;
-- normalisasi dan validasi nomor;
-- kirim satu pesan teks nyata;
-- kembalikan provider message ID/status/error secara aman.
+Kerjakan **WA-006 — Minimal Delivery Log & Error Contract** di local:
+- correlation/request ID;
+- tenant/device/type/result;
+- destination harus masked pada log;
+- provider message ID;
+- safe error code/message;
+- timestamp;
+- jangan menambah campaign queue/scheduler.
 
-Jangan deploy VPS sebelum local gate WA-003 sampai WA-008 selesai.
+Jangan deploy VPS sebelum local gate WA-006 sampai WA-008 selesai.

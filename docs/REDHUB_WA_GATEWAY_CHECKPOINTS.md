@@ -357,20 +357,69 @@ PDF source validation, size/type guards, in-memory delivery, filename/caption ha
 ---
 
 ## WA-005 — Multi-Tenant Isolation
-**Status: PENDING**
+**Status: PASS / LOCKED**  
+**Date:** 2026-10-05  
+**Branch:** `feat/redhub-wa-005-multitenant-isolation`  
+**Implementation commit:** `98c047ea4be6acaa86dea44226350f74719d036f`  
+**Tenant-neutral config commit:** `9cb6fdd01aec53c5b5fc5657ec185ed116ca4fbb`
 
-### Required
-- tenant registry/identity;
-- device/session ownership;
-- one default device per tenant baseline;
-- future multi-device compatible;
-- multiple tenant sessions can coexist.
+### Implemented
+- runtime registry keyed by `tenantId + deviceId`;
+- tenant-scoped device listing/status/pairing lookup;
+- cross-tenant device access rejected;
+- session storage layout `SESSION_DIR/<tenantId>/<deviceId>/`;
+- legacy single-tenant session migration to nested tenant/device path;
+- persisted tenant sessions are discovered/restored on startup;
+- same `deviceId` may exist under different tenants without collision;
+- one-device tenant acts as implicit default when `deviceId` is omitted;
+- multi-device tenant requires explicit `deviceId` via `DEVICE_REQUIRED`;
+- Jember-specific fallback removed from core config; default tenant/device must be supplied by environment.
 
-### Acceptance
-- tenant A cannot use tenant B session/device;
-- session paths isolated;
-- tenant-specific status/pairing/send works;
-- no permanent Jember hard-code in core.
+### Automated Verification
+Local verification:
+- typecheck: PASS;
+- unit tests: **20/20 PASS**;
+- build: PASS.
+
+Docker verification:
+- Docker image build: PASS;
+- embedded typecheck/test/build: **20/20 PASS**;
+- final image recreate: PASS.
+
+### Unit Isolation Coverage
+- tenant context required for status/list;
+- same device ID can coexist in two tenants;
+- tenant-scoped lookup returns correct owner;
+- single-device tenant resolves implicit default;
+- multi-device tenant requires explicit device ID;
+- existing cross-tenant text/document protection regression tests remain PASS.
+
+### Real Runtime Verification — 2026-10-05
+Existing paired Jember session was migrated without unpairing:
+- before migration rollback backup created outside Git;
+- device returned directly to `CONNECTED`;
+- `HAS_QR=false`;
+- nested credential path exists: `jember/jember-main/creds.json`;
+- legacy `jember-main/creds.json` path no longer exists;
+- `GET /api/v1/devices?tenantId=jember` returned exactly one Jember device;
+- wrong-tenant status lookup returned `404 DEVICE_NOT_FOUND`;
+- explicit cross-tenant send attempt returned `403 DEVICE_TENANT_MISMATCH` and did not send;
+- implicit-default resolution verified without sending by reaching phone validation (`400 INVALID_PHONE`);
+- final sensitive-log scan: PASS.
+
+### Rollback Evidence
+Pre-migration local session archive created outside repository:
+`D:\Projects\redhub-wa-gateway-backups\wa005-session-pre-migration.tgz`
+
+This backup contains WhatsApp session credentials and must never be committed/shared.
+
+### Acceptance Result
+**PASS / LOCKED**
+
+Tenant ownership, tenant-scoped session paths, default-device behavior, future multi-device semantics, migration compatibility, restart recovery, and log hygiene are verified.
+
+### Next
+**WA-006 — Minimal Delivery Log & Error Contract**
 
 ---
 
@@ -489,9 +538,9 @@ Histori tidak dihapus; digantikan oleh WA-001A atas instruksi eksplisit user.
 
 ## CURRENT POSITION
 
-- **LAST PASS / LOCKED:** WA-004 — PDF / Document Delivery API
+- **LAST PASS / LOCKED:** WA-005 — Multi-Tenant Isolation
 - **IN PROGRESS:** none
-- **NEXT:** WA-005 — Multi-Tenant Isolation
+- **NEXT:** WA-006 — Minimal Delivery Log & Error Contract
 - **VPS DEPLOY:** NOT STARTED
 - **TARGET VPS:** `202.10.36.74`
 - **WORKFLOW:** local first -> verified -> checkpoint -> production

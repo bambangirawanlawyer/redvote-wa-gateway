@@ -400,3 +400,42 @@ Setiap tahap pekerjaan wajib:
 7. baru lanjut tahap berikutnya.
 
 Tidak boleh menggabungkan beberapa tahap sebagai PASS tanpa evidence masing-masing.
+
+
+## RHWA-D-044 — Tenant-Scoped Session Identity
+WA-005 locks WhatsApp runtime/session identity to the composite:
+
+`tenantId + deviceId`
+
+Persistent session layout:
+
+```text
+SESSION_DIR/<tenantId>/<deviceId>/
+```
+
+Consequences:
+- the same device ID may exist under different tenants without collision;
+- all tenant-scoped status/pairing/send lookups must resolve ownership;
+- tenant A must not use tenant B session/device.
+
+## RHWA-D-045 — Single-Device Tenant Is the V1 Implicit Default
+To keep the delivery API simple:
+- when a tenant has exactly one runtime device, `deviceId` may be omitted for text/PDF delivery;
+- when a tenant has more than one runtime device, `deviceId` becomes mandatory;
+- omission with multiple devices returns `DEVICE_REQUIRED`.
+
+This gives V1 a simple default-device behavior without adding a separate default-device database table.
+
+## RHWA-D-046 — Persisted Tenant Sessions Restore on Startup
+Gateway startup discovers tenant/device session directories containing credentials and starts them automatically.
+
+The previous WA-002 single-level session layout is migrated once to the tenant/device layout using configured legacy/default tenant and device IDs.
+
+Migration must preserve the paired session and must not force a new QR.
+
+## RHWA-D-047 — No Tenant-Specific Core Defaults
+Core configuration must not permanently default to Jember or any organization.
+
+`DEFAULT_TENANT_ID` and `DEFAULT_DEVICE_ID` must be provided by environment/configuration for a deployment.
+
+Jember remains only the first pilot configuration, not a core architecture assumption.
