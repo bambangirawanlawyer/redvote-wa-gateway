@@ -19,12 +19,16 @@
     "dotenv": "^17.2.3",
     "fastify": "^5.6.1",
     "pg": "^8.16.3",
-    "pino": "^9.9.4"
+    "pino": "^9.9.4",
+    "@hapi/boom": "^10.0.1",
+    "baileys": "7.0.0-rc14",
+    "qrcode": "^1.5.4"
   },
   "devDependencies": {
     "@types/node": "^24.7.2",
     "@types/pg": "^8.15.5",
     "tsx": "^4.20.6",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "@types/qrcode": "^1.5.5"
   }
 }
