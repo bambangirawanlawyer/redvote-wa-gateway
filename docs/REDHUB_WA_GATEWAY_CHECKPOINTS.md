@@ -665,6 +665,34 @@ WA-008 remains **not PASS** and is deferred as an external dependency. It does *
 ### Target
 VPS `202.10.36.74`.
 
+### Pre-Deployment Preparation — PASS
+Delivered on branch `feat/redhub-wa-009-vps-deploy`:
+- `docs/REDHUB_WA_GATEWAY_WA009_DEPLOYMENT.md`;
+- `redhub-gateway/scripts/wa009-preflight.sh`;
+- `redhub-gateway/scripts/backup-production.sh`;
+- `redhub-gateway/scripts/verify-backup.sh`;
+- `backups/` added to Git ignore.
+
+Local verification:
+- Docker Compose config validation: PASS;
+- all Linux deployment scripts syntax-checked inside Alpine container: PASS;
+- local session backup created successfully;
+- local PostgreSQL custom-format backup created successfully;
+- session archive contains `creds.json`;
+- PostgreSQL dump readability verification: PASS;
+- backup verification was non-destructive;
+- existing local WhatsApp session remained CONNECTED.
+
+### VPS Access Preflight
+- TCP port 22 on `202.10.36.74`: OPEN;
+- existing local SSH keys `redhub_deploy_ed25519` and `kurirobat_vps_ed25519` were tested read-only against the new VPS;
+- neither key is currently authorized on the new VPS;
+- no command was executed on the old VPS.
+
+**Current deployment blocker:** authorize a trusted SSH key or otherwise provide one-time authenticated shell access to `root@202.10.36.74`.
+
+This is an access blocker only; WA-009 remains IN PROGRESS and no production change has yet been made.
+
 ### Required
 - Docker + Compose;
 - production env/secrets;

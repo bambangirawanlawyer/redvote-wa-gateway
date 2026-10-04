@@ -10,3 +10,4 @@ coverage/
 data/postgres/
 data/whatsapp-sessions/
 sessions/
+backups/
