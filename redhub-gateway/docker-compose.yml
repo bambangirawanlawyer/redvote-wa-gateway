@@ -1,0 +1,53 @@
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: redhub_wa
+      POSTGRES_USER: redhub_wa_app
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-redhub_local_dev_only}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U redhub_wa_app -d redhub_wa"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - redhub_wa_pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  gateway:
+    build:
+      context: .
+      target: production
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      HOST: 0.0.0.0
+      PORT: 3410
+      DATABASE_URL: postgresql://redhub_wa_app:${POSTGRES_PASSWORD:-redhub_local_dev_only}@db:5432/redhub_wa
+      API_TOKEN_SECRET: ${API_TOKEN_SECRET:-local-dev-only-change-me}
+      SESSION_DIR: /app/data/whatsapp-sessions
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      SERVICE_VERSION: ${SERVICE_VERSION:-0.1.0}
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:3410:3410"
+    volumes:
+      - redhub_wa_sessions:/app/data/whatsapp-sessions
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3410/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+volumes:
+  redhub_wa_pgdata:
+  redhub_wa_sessions:
