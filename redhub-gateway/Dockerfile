@@ -24,7 +24,7 @@ COPY migrations ./migrations
 RUN addgroup -S app \
     && adduser -S -G app app \
     && mkdir -p /app/data/whatsapp-sessions \
-    && chown -R app:app /app
+    && chown app:app /app/data/whatsapp-sessions
 
 USER app
 

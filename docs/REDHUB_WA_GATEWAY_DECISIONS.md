@@ -293,3 +293,110 @@ Reason:
 WA-001 foundation may be locked using an isolated Docker CI runner when it validates the same Docker Compose build/start/health/migration/restart behavior without touching production.
 
 For WA-002 and later checkpoints that require a real WhatsApp account/QR/session, real device validation is mandatory and CI simulation is not a substitute.
+
+
+## RHWA-D-035 — WA-002 Baileys Version Pin
+WA-002 uses `baileys@7.0.0-rc14` as the initial pinned provider version because the repository already had compatibility with this API shape.
+
+Do not silently upgrade the provider version during the pairing checkpoint. Upgrade only after regression tests and a recorded decision.
+
+## RHWA-D-036 — Protected QR Access
+QR pairing data is sensitive short-lived operational state.
+
+Rules:
+- no QR in normal application logs;
+- JSON QR endpoint requires internal bearer auth;
+- PNG QR endpoint requires internal bearer auth;
+- QR endpoint is for pairing only and returns 404 when no active QR exists;
+- production UI integration is deferred; WA-002 testing may save the authenticated PNG response locally for scanning.
+
+
+---
+
+# Scope Revision — 2026-10-05
+
+Keputusan berikut dibuat berdasarkan instruksi eksplisit user dan **menggantikan bagian keputusan lama yang bertentangan**, tanpa menghapus histori.
+
+## RHWA-D-037 — RedHub Backend Owns Broadcast and Reminder
+Backend RedHub adalah pemilik business orchestration untuk:
+- broadcast;
+- reminder H-1;
+- scheduling;
+- recipient selection/segmentation;
+- meeting/event business data;
+- keputusan re-send/retry bisnis;
+- business duplicate prevention.
+
+WA Gateway tidak mengimplementasikan ulang fungsi-fungsi tersebut.
+
+## RHWA-D-038 — Gateway Is a Simple Multi-Tenant Delivery Layer
+V1 WA Gateway disederhanakan menjadi:
+```text
+RedHub Backend -> Internal WA Gateway API -> Tenant WhatsApp Session -> WhatsApp
+```
+
+Gateway hanya menangani:
+- tenant/device resolution;
+- session lifecycle;
+- persistent auth/session;
+- reconnect;
+- text delivery;
+- PDF/document delivery;
+- provider result/error;
+- minimal delivery log/audit;
+- security and tenant isolation.
+
+## RHWA-D-039 — Supersede Gateway Campaign Queue / Business Retry Engine
+Keputusan lama yang mewajibkan gateway-side persistent campaign queue, business retry orchestration, dan business idempotency engine **SUPERSEDED untuk V1**.
+
+Secara khusus, bagian RHWA-D-012, RHWA-D-013, dan RHWA-D-014 yang menempatkan tanggung jawab tersebut di gateway tidak lagi menjadi requirement V1.
+
+PostgreSQL yang sudah ada dari WA-001 tetap boleh dipakai untuk:
+- tenant/device metadata;
+- minimal delivery log;
+- operational metadata.
+
+PostgreSQL tidak wajib menjadi campaign scheduler/queue.
+
+## RHWA-D-040 — Delivery API, Not Invitation Business API
+API utama V1 memakai generic delivery contract:
+- `POST /api/v1/messages/text`
+- `POST /api/v1/messages/document`
+
+Gateway menerima payload yang sudah siap dikirim dari backend.
+
+Gateway tidak merender business invitation dari meeting/member data dan tidak menentukan kapan recipient menerima reminder.
+
+## RHWA-D-041 — Local-First Remains Mandatory
+Walaupun gateway disederhanakan, development tetap:
+```text
+local Docker -> real functional test -> PASS/LOCKED -> VPS deploy
+```
+
+Production target:
+`202.10.36.74`
+
+VPS lama:
+`202.10.45.147`
+tidak disentuh kecuali user memberi instruksi eksplisit.
+
+## RHWA-D-042 — Multi-Tenant Session Isolation Remains Mandatory
+Penyederhanaan scope tidak menghapus requirement multi-tenant.
+
+Minimal:
+- setiap tenant punya ownership device/session;
+- tenant A tidak dapat memakai tenant B device/session;
+- baseline satu default device per tenant;
+- future multi-device tetap dimungkinkan.
+
+## RHWA-D-043 — Checkpoint per Successful Stage
+Setiap tahap pekerjaan wajib:
+1. implement;
+2. test;
+3. catat evidence;
+4. commit;
+5. update checkpoint;
+6. tandai PASS / LOCKED jika seluruh acceptance criteria lulus;
+7. baru lanjut tahap berikutnya.
+
+Tidak boleh menggabungkan beberapa tahap sebagai PASS tanpa evidence masing-masing.
