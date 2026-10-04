@@ -139,6 +139,13 @@ Documentation source of truth updated:
 - `REDHUB_WA_GATEWAY_DECISIONS.md`;
 - `REDHUB_WA_GATEWAY_API_CONTRACT.md`.
 
+Documentation commits for this scope revision:
+- START HERE: `8d7e8e63536f90fe563fac44d5c64f9a09b0672b`;
+- MASTER HANDOFF: `0cf5cf360ee344094d818f3bab439e75ce88165e`;
+- CHECKPOINT initial revision: `18de2ed640c2856aca46350919a4561400d5bbe9`;
+- DECISIONS: `6504ac1f79fc1b85914763d26a9e874c51f57910`;
+- API CONTRACT: `33094bc47376e945e2f5c186e680e25ebea230ad`.
+
 ### Deployment State
 Not deployed. Local-first remains locked.
 
