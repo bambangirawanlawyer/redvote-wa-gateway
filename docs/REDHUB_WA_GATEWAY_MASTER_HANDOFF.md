@@ -244,7 +244,7 @@ Non-sending smoke against the real local gateway passes health, tenant mapping, 
 WA-008 may only be locked after the actual RedHub backend is accessible and verified to call text/PDF delivery while keeping broadcast/reminder H-1 orchestration in RedHub.
 
 ### WA-009 - VPS Deployment
-**IN PROGRESS - standalone gateway deployed and paired; final exit gates pending.**
+**PASS / LOCKED - 2026-10-05**
 
 Production state:
 - deployed on `202.10.36.74` from verified WA-009 branch/commit;
@@ -259,20 +259,25 @@ Production state:
 - existing Nginx and `redhub-hybrid.service` remain active;
 - old VPS `202.10.45.147` was not touched.
 
-Remaining before WA-009 lock:
-- user-visible receipt confirmation for production text + PDF;
-- VPS reboot persistence gate and post-reboot verification.
+Final production acceptance:
+- user confirmed both controlled production text and PDF were visibly received;
+- full VPS reboot completed and all required services recovered automatically;
+- WhatsApp returned CONNECTED without re-pairing;
+- gateway remained healthy and loopback-only;
+- delivery logs persisted;
+- isolated session and PostgreSQL restore tests both PASS;
+- existing Nginx and `redhub-hybrid.service` remained healthy;
+- deployment evidence commit: `37d1356`.
 
 ### WA-010 - Production End-to-End
 RedHub backend -> gateway -> WhatsApp untuk text/PDF serta reminder H-1 yang **dipicu oleh RedHub backend**.
 
 ## 12. Current Position
 
-**LAST PASS / LOCKED:** WA-007 — Security Gate  
-**DEFERRED:** WA-008 — Local RedHub Contract Validation (actual RedHub backend unavailable)  
-**IN PROGRESS:** WA-009 — Production Deployment  
-**WA-010:** blocked until WA-008 actual RedHub integration is completed  
-**PRODUCTION:** gateway deployed, paired, healthy; final WA-009 exit gates pending
+**LAST PASS / LOCKED:** WA-009 - Production Deployment
+**DEFERRED:** WA-008 — Local RedHub Contract Validation (actual RedHub backend unavailable)
+**WA-010:** blocked until WA-008 actual RedHub integration is completed
+**PRODUCTION:** WA-009 PASS / LOCKED; standalone gateway healthy on VPS
 **TARGET VPS:** 202.10.36.74
 
 ## 13. Handoff Rule

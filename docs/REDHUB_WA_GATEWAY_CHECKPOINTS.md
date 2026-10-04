@@ -25,7 +25,7 @@ Setiap checkpoint yang PASS wajib mencatat:
 ---
 
 ## WA-000 — Architecture & Contract
-**Status: PASS / LOCKED (historical baseline)**  
+**Status: PASS / LOCKED (historical baseline)**
 **Date:** 2026-10-04
 
 Baseline awal:
@@ -43,9 +43,9 @@ Catatan: bagian queue/campaign/retry-business dari baseline awal kemudian **dise
 ---
 
 ## WA-001 — Local Docker Foundation
-**Status: PASS / LOCKED**  
-**Date:** 2026-10-04  
-**Branch:** `feat/redhub-wa-001-foundation`  
+**Status: PASS / LOCKED**
+**Date:** 2026-10-04
+**Branch:** `feat/redhub-wa-001-foundation`
 **Implementation head:** `e7be8fda559242a34fbbd3b4814e16650b8bd139`
 
 ### Delivered
@@ -82,8 +82,8 @@ WA-001A / WA-002.
 ---
 
 ## WA-001A — Scope Simplification / Delivery-Layer Lock
-**Status: PASS / LOCKED**  
-**Date:** 2026-10-05  
+**Status: PASS / LOCKED**
+**Date:** 2026-10-05
 **Branch:** `feat/redhub-wa-002-session`
 
 ### User Decision
@@ -158,9 +158,9 @@ If future requirements require gateway-side queue/scheduler, create a new decisi
 ---
 
 ## WA-002 — WhatsApp Device & Persistent Session
-**Status: PASS / LOCKED**  
-**Date:** 2026-10-05  
-**Branch:** `feat/redhub-wa-002-session`  
+**Status: PASS / LOCKED**
+**Date:** 2026-10-05
+**Branch:** `feat/redhub-wa-002-session`
 **Implementation commit:** `4890da8d0c56e15eca441827a43932bdeaf7a81c`
 
 ### Implemented
@@ -212,10 +212,10 @@ Local only. VPS deployment has not started.
 ---
 
 ## WA-003 — Text Delivery API
-**Status: PASS / LOCKED**  
-**Date:** 2026-10-05  
-**Branch:** `feat/redhub-wa-003-text-delivery`  
-**Implementation commit:** `5a816fd`  
+**Status: PASS / LOCKED**
+**Date:** 2026-10-05
+**Branch:** `feat/redhub-wa-003-text-delivery`
+**Implementation commit:** `5a816fd`
 **Provider-error test commit:** `cdd0abc`
 
 ### Implemented
@@ -277,9 +277,9 @@ Text delivery, tenant/device validation, provider response handling, real-device
 ---
 
 ## WA-004 — PDF / Document Delivery API
-**Status: PASS / LOCKED**  
-**Date:** 2026-10-05  
-**Branch:** `feat/redhub-wa-004-document-delivery`  
+**Status: PASS / LOCKED**
+**Date:** 2026-10-05
+**Branch:** `feat/redhub-wa-004-document-delivery`
 **Implementation commit:** `f833ef3828b8d8a5d0fb12dc5a54149ded4f46ee`
 
 ### Implemented
@@ -357,10 +357,10 @@ PDF source validation, size/type guards, in-memory delivery, filename/caption ha
 ---
 
 ## WA-005 — Multi-Tenant Isolation
-**Status: PASS / LOCKED**  
-**Date:** 2026-10-05  
-**Branch:** `feat/redhub-wa-005-multitenant-isolation`  
-**Implementation commit:** `98c047ea4be6acaa86dea44226350f74719d036f`  
+**Status: PASS / LOCKED**
+**Date:** 2026-10-05
+**Branch:** `feat/redhub-wa-005-multitenant-isolation`
+**Implementation commit:** `98c047ea4be6acaa86dea44226350f74719d036f`
 **Tenant-neutral config commit:** `9cb6fdd01aec53c5b5fc5657ec185ed116ca4fbb`
 
 ### Implemented
@@ -424,9 +424,9 @@ Tenant ownership, tenant-scoped session paths, default-device behavior, future m
 ---
 
 ## WA-006 — Minimal Delivery Log & Error Contract
-**Status: PASS / LOCKED**  
-**Date:** 2026-10-05  
-**Branch:** `feat/redhub-wa-006-delivery-log`  
+**Status: PASS / LOCKED**
+**Date:** 2026-10-05
+**Branch:** `feat/redhub-wa-006-delivery-log`
 **Implementation commit:** `4b5d560c7a95d3d9604ad261bf91269917f0b856`
 
 ### Implemented
@@ -499,10 +499,10 @@ Correlation, masked audit data, provider result, safe failures, timestamps, pers
 ---
 
 ## WA-007 — Security Gate
-**Status: PASS / LOCKED**  
-**Date:** 2026-10-05  
-**Branch:** `feat/redhub-wa-007-security-gate`  
-**Security implementation commit:** `391c43b416d94ae9705d26aed9a6c5665cdd4e06`  
+**Status: PASS / LOCKED**
+**Date:** 2026-10-05
+**Branch:** `feat/redhub-wa-007-security-gate`
+**Security implementation commit:** `391c43b416d94ae9705d26aed9a6c5665cdd4e06`
 **Compose hardening commit:** `d01ac40926a43a7fc31e927afca8e48d2b4733be`
 
 ### Implemented
@@ -593,9 +593,9 @@ Bearer auth, payload validation, tenant ownership, PDF/document limits, SSRF pro
 ---
 
 ## WA-008 — Local RedHub Contract Validation
-**Status: DEFERRED / EXTERNAL DEPENDENCY**  
-**Date:** 2026-10-05  
-**Branch:** `feat/redhub-wa-008-redhub-contract`  
+**Status: DEFERRED / EXTERNAL DEPENDENCY**
+**Date:** 2026-10-05
+**Branch:** `feat/redhub-wa-008-redhub-contract`
 **Gateway contract harness commit:** `5468595bf3270f95585ce5fb3bde1e4540e7d29e`
 
 ### Goal
@@ -658,8 +658,8 @@ WA-008 remains **not PASS** and is deferred as an external dependency. It does *
 ---
 
 ## WA-009 — Production Deployment
-**Status: IN PROGRESS**  
-**Date:** 2026-10-05  
+**Status: PASS / LOCKED**
+**Date:** 2026-10-05
 **Branch:** `feat/redhub-wa-009-vps-deploy`
 
 ### Target
@@ -710,11 +710,29 @@ Local verification:
 - existing `nginx` and `redhub-hybrid.service` remained active after deployment and restart tests;
 - old VPS `202.10.45.147` was not touched.
 
-### Remaining WA-009 Exit Gates
-- user-visible receipt confirmation for the controlled production text and PDF;
-- VPS reboot persistence gate, followed by health/session/existing-service verification.
+### Final Acceptance — 2026-10-05
+- user confirmed both controlled production messages were visibly received: text + `RedHub-WA009-Test.pdf`;
+- full VPS reboot completed successfully;
+- SSH returned after reboot;
+- Docker, Nginx, and `redhub-hybrid.service` returned active automatically;
+- PostgreSQL and gateway containers returned healthy automatically;
+- `GET /health` remained HTTP 200 / database `ok`;
+- WhatsApp session returned to `CONNECTED` with `HAS_QR=false` without re-pairing;
+- production TEXT and DOCUMENT delivery log rows remained persisted as `SENT`;
+- gateway exposure remained loopback-only on `127.0.0.1:3410`;
+- PostgreSQL remained without a published host port;
+- isolated session restore test from production backup: PASS;
+- isolated PostgreSQL restore test from production backup: PASS;
+- temporary restore database/session test data was removed after verification;
+- existing Nginx and RedHub hybrid service remained healthy;
+- old VPS `202.10.45.147` was not touched.
 
-WA-009 remains **IN PROGRESS** until those final gates pass.
+### Acceptance Result
+**PASS / LOCKED**
+
+WA-009 production deployment, pairing, persistence, delivery, backup/restore, reboot recovery, network isolation, coexistence with existing services, and user-visible receipt are verified.
+
+**Deployment evidence commit:** `37d1356`
 
 ### Required
 - Docker + Compose;
@@ -770,10 +788,9 @@ Histori tidak dihapus; digantikan oleh WA-001A atas instruksi eksplisit user.
 
 ## CURRENT POSITION
 
-- **LAST PASS / LOCKED:** WA-007 — Security Gate
+- **LAST PASS / LOCKED:** WA-009 — Production Deployment
 - **DEFERRED:** WA-008 — Local RedHub Contract Validation (actual RedHub backend unavailable)
-- **IN PROGRESS:** WA-009 — Production Deployment
 - **WA-010:** blocked until WA-008 actual RedHub integration is completed
-- **VPS DEPLOY:** IN PROGRESS
+- **VPS DEPLOY:** PASS / LOCKED
 - **TARGET VPS:** `202.10.36.74`
 - **WORKFLOW:** local first -> verified -> checkpoint -> production
