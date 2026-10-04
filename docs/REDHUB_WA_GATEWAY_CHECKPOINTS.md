@@ -277,7 +277,7 @@ Text delivery, tenant/device validation, provider response handling, real-device
 ---
 
 ## WA-004 — PDF / Document Delivery API
-**Status: IN PROGRESS**  
+**Status: PASS / LOCKED**  
 **Date:** 2026-10-05  
 **Branch:** `feat/redhub-wa-004-document-delivery`  
 **Implementation commit:** `f833ef3828b8d8a5d0fb12dc5a54149ded4f46ee`
@@ -341,14 +341,17 @@ Temporary PDF source was hosted locally for the test only.
 - sensitive log scan after real PDF send: PASS;
 - no session key material, API token, Authorization header, filename, or caption leaked to logs.
 
-### Remaining Acceptance Gate
-User confirmation required that the real PDF is visibly received in WhatsApp as a document, with:
+### Final Real-Device Acceptance — 2026-10-05
+User confirmed the real PDF was visibly received in WhatsApp as a document with:
 - filename `Undangan Test WA-004.pdf`;
 - caption `TEST REDHUB WA GATEWAY WA-004 - PDF document delivery berhasil.`
 
-WA-004 MUST NOT be marked PASS / LOCKED until visible receipt is confirmed.
+### Acceptance Result
+**PASS / LOCKED**
 
-### Next After PASS
+PDF source validation, size/type guards, in-memory delivery, filename/caption handling, real-device receipt, tenant protection, cleanup, reconnect safety, and log hygiene are verified.
+
+### Next
 **WA-005 — Multi-Tenant Isolation**
 
 ---
@@ -486,9 +489,9 @@ Histori tidak dihapus; digantikan oleh WA-001A atas instruksi eksplisit user.
 
 ## CURRENT POSITION
 
-- **LAST PASS / LOCKED:** WA-003 — Text Delivery API
-- **IN PROGRESS:** WA-004 — PDF / Document Delivery API (waiting visible receipt confirmation)
-- **NEXT AFTER PASS:** WA-005 — Multi-Tenant Isolation
+- **LAST PASS / LOCKED:** WA-004 — PDF / Document Delivery API
+- **IN PROGRESS:** none
+- **NEXT:** WA-005 — Multi-Tenant Isolation
 - **VPS DEPLOY:** NOT STARTED
 - **TARGET VPS:** `202.10.36.74`
 - **WORKFLOW:** local first -> verified -> checkpoint -> production
