@@ -277,23 +277,79 @@ Text delivery, tenant/device validation, provider response handling, real-device
 ---
 
 ## WA-004 — PDF / Document Delivery API
-**Status: PENDING**
+**Status: IN PROGRESS**  
+**Date:** 2026-10-05  
+**Branch:** `feat/redhub-wa-004-document-delivery`  
+**Implementation commit:** `f833ef3828b8d8a5d0fb12dc5a54149ded4f46ee`
 
-### Required
+### Implemented
 - `POST /api/v1/messages/document`;
-- source URL/file handling;
-- MIME/type/size validation;
-- safe filename;
-- caption optional;
-- send WhatsApp document;
-- temp cleanup.
+- authenticated internal API;
+- tenant/device validation before PDF fetch;
+- HTTP/HTTPS source validation;
+- MIME `application/pdf` validation;
+- PDF magic `%PDF-` validation;
+- maximum PDF size 10 MB;
+- streamed download with early cancel when limit exceeded;
+- filename sanitization and automatic `.pdf` suffix;
+- optional caption with length validation;
+- in-memory delivery only — no temporary PDF file stored by gateway;
+- Baileys document send with `application/pdf`;
+- provider message ID returned;
+- request correlation ID passthrough;
+- safe provider error mapping.
 
-### Acceptance
-- one real PDF received as document;
-- filename correct;
-- caption correct when supplied;
-- invalid source rejected safely;
-- temp data cleaned.
+### Automated Verification
+Local Node verification:
+- typecheck: PASS;
+- unit tests: **16/16 PASS**;
+- build: PASS.
+
+Docker verification:
+- Docker image build: PASS;
+- embedded typecheck/test/build: PASS;
+- persistent WhatsApp session survived recreate;
+- device returned directly to `CONNECTED` without QR.
+
+### Unit Coverage
+- missing bearer token rejected;
+- valid PDF fetched and sent in memory;
+- filename/caption preserved after sanitization;
+- invalid source protocol rejected;
+- non-PDF MIME rejected;
+- oversized PDF rejected before full body read;
+- cross-tenant request rejected before external fetch;
+- provider error returned safely.
+
+### Real API Verification — 2026-10-05
+Temporary PDF source was hosted locally for the test only.
+- source reachable from gateway: HTTP `200`;
+- content type: `application/pdf`;
+- PDF magic: `%PDF-`;
+- invalid source -> HTTP `400` / `INVALID_DOCUMENT_SOURCE`: PASS;
+- cross-tenant -> HTTP `403` / `DEVICE_TENANT_MISMATCH`: PASS;
+- real PDF send -> HTTP `200`: PASS;
+- response `success=true`: PASS;
+- filename returned: `Undangan Test WA-004.pdf`;
+- provider message ID present: PASS;
+- request ID preserved: PASS.
+
+### Cleanup & Log Hygiene
+- gateway uses in-memory PDF buffer only;
+- gateway `/tmp` PDF count after test: `0`;
+- temporary local PDF source/test scripts removed;
+- sensitive log scan after real PDF send: PASS;
+- no session key material, API token, Authorization header, filename, or caption leaked to logs.
+
+### Remaining Acceptance Gate
+User confirmation required that the real PDF is visibly received in WhatsApp as a document, with:
+- filename `Undangan Test WA-004.pdf`;
+- caption `TEST REDHUB WA GATEWAY WA-004 - PDF document delivery berhasil.`
+
+WA-004 MUST NOT be marked PASS / LOCKED until visible receipt is confirmed.
+
+### Next After PASS
+**WA-005 — Multi-Tenant Isolation**
 
 ---
 
@@ -431,8 +487,8 @@ Histori tidak dihapus; digantikan oleh WA-001A atas instruksi eksplisit user.
 ## CURRENT POSITION
 
 - **LAST PASS / LOCKED:** WA-003 — Text Delivery API
-- **IN PROGRESS:** none
-- **NEXT:** WA-004 — PDF / Document Delivery API
+- **IN PROGRESS:** WA-004 — PDF / Document Delivery API (waiting visible receipt confirmation)
+- **NEXT AFTER PASS:** WA-005 — Multi-Tenant Isolation
 - **VPS DEPLOY:** NOT STARTED
 - **TARGET VPS:** `202.10.36.74`
 - **WORKFLOW:** local first -> verified -> checkpoint -> production
