@@ -27,6 +27,10 @@ export type AppConfig = {
   sessionDir: string;
   logLevel: string;
   serviceVersion: string;
+  defaultTenantId: string;
+  defaultDeviceId: string;
+  autoStartWhatsApp: boolean;
+  whatsappReconnectDelayMs: number;
 };
 
 export function loadConfig(): AppConfig {
@@ -38,6 +42,10 @@ export function loadConfig(): AppConfig {
     apiTokenSecret: required('API_TOKEN_SECRET'),
     sessionDir: process.env.SESSION_DIR ?? './data/whatsapp-sessions',
     logLevel: process.env.LOG_LEVEL ?? 'info',
-    serviceVersion: process.env.SERVICE_VERSION ?? '0.1.0'
+    serviceVersion: process.env.SERVICE_VERSION ?? '0.1.0',
+    defaultTenantId: process.env.DEFAULT_TENANT_ID ?? 'jember',
+    defaultDeviceId: process.env.DEFAULT_DEVICE_ID ?? 'jember-main',
+    autoStartWhatsApp: (process.env.AUTO_START_WHATSAPP ?? 'false').toLowerCase() === 'true',
+    whatsappReconnectDelayMs: Number(process.env.WHATSAPP_RECONNECT_DELAY_MS ?? '5000')
   };
 }
