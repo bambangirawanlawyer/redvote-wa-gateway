@@ -108,7 +108,8 @@ VPS lama `202.10.45.147` tidak disentuh kecuali ada instruksi eksplisit.
 - WA-000 — historical architecture baseline — PASS / LOCKED
 - WA-001 — Local Docker Foundation — PASS / LOCKED
 - WA-001A — Scope Simplification: RedHub Owns Broadcast/Reminder — PASS / LOCKED
-- WA-002 — WhatsApp Device & Persistent Session — IN PROGRESS
+- WA-002 — WhatsApp Device & Persistent Session — PASS / LOCKED
+- WA-003 — Text Delivery API — NEXT
 - Production deploy — NOT STARTED
 
 ## Mandatory Workflow
@@ -127,10 +128,11 @@ Tidak boleh mengklaim PASS tanpa verifikasi.
 
 ## Next Action
 
-Selesaikan **WA-002** di local:
-- pair satu nomor test;
-- status CONNECTED;
-- restart container tanpa QR baru;
-- reconnect/log hygiene.
+Kerjakan **WA-003 — Text Delivery API** di local:
+- endpoint `POST /api/v1/messages/text`;
+- resolve tenant/device;
+- normalisasi dan validasi nomor;
+- kirim satu pesan teks nyata;
+- kembalikan provider message ID/status/error secara aman.
 
-Setelah WA-002 PASS / LOCKED, lanjut **WA-003 — Text Delivery API**.
+Jangan deploy VPS sebelum local gate WA-003 sampai WA-008 selesai.

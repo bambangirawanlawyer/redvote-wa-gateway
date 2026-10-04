@@ -4,9 +4,9 @@ Private outbound WhatsApp invitation gateway for RedHub.
 
 ## Current checkpoint
 
-**WA-002 — WhatsApp Device & Persistent Session — IN PROGRESS**
+**WA-002 — WhatsApp Device & Persistent Session — PASS / LOCKED**
 
-Foundation WA-001 is PASS/LOCKED. WA-002 code now includes a Baileys device manager, protected pairing/status endpoints, persistent session volume, automatic reconnect, and optional auto-start. Real WhatsApp pairing is still required before WA-002 can be locked.
+WA-002 real-device validation passed on 2026-10-05: pairing succeeded, status reached CONNECTED, session survived container recreate and stop/start without a new QR, and Baileys internal logs were hardened. Next checkpoint: **WA-003 — Text Delivery API**.
 
 ## Local prerequisites
 

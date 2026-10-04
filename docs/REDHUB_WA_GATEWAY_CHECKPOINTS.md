@@ -158,9 +158,10 @@ If future requirements require gateway-side queue/scheduler, create a new decisi
 ---
 
 ## WA-002 — WhatsApp Device & Persistent Session
-**Status: IN PROGRESS**  
+**Status: PASS / LOCKED**  
+**Date:** 2026-10-05  
 **Branch:** `feat/redhub-wa-002-session`  
-**Implementation head before scope-doc revision:** `26eceab15455699893cd85fa573c9bd99a58bce5`
+**Implementation commit:** `4890da8d0c56e15eca441827a43932bdeaf7a81c`
 
 ### Implemented
 - Baileys `7.0.0-rc14`;
@@ -186,16 +187,26 @@ GitHub Actions run **37171410041**: SUCCESS.
 - health/migration PASS;
 - restart smoke PASS.
 
-### Remaining Real-Device Gate
-WA-002 belum boleh PASS/LOCKED sebelum:
-1. real WhatsApp test number paired;
-2. status CONNECTED;
-3. session persists in Docker volume;
-4. container restart reconnects without new QR;
-5. reconnect behavior verified;
-6. runtime logs verified clean of QR/session credential.
+### Real-Device Verification — 2026-10-05
+- real WhatsApp test number paired successfully;
+- device status reached `CONNECTED`;
+- tenant/device resolved as `jember` / `jember-main`;
+- QR cleared after successful pairing;
+- persistent session exists in Docker volume;
+- container recreate with auto-start returned directly to `CONNECTED` without a new QR;
+- explicit container stop/start also returned directly to `CONNECTED` without a new QR;
+- runtime log hygiene check PASS after Baileys internal logging was silenced;
+- temporary QR images and local verification scripts were deleted before commit.
 
-### Next After PASS
+### Acceptance Result
+**PASS / LOCKED**
+
+Real pairing, persistence, restart recovery, reconnect, and log hygiene are verified.
+
+### Deployment State
+Local only. VPS deployment has not started.
+
+### Next
 **WA-003 — Text Delivery API**
 
 ---
@@ -374,9 +385,9 @@ Histori tidak dihapus; digantikan oleh WA-001A atas instruksi eksplisit user.
 
 ## CURRENT POSITION
 
-- **LAST PASS / LOCKED:** WA-001A — Scope Simplification / Delivery-Layer Lock
-- **IN PROGRESS:** WA-002 — WhatsApp Device & Persistent Session
-- **NEXT AFTER PASS:** WA-003 — Text Delivery API
+- **LAST PASS / LOCKED:** WA-002 — WhatsApp Device & Persistent Session
+- **IN PROGRESS:** none
+- **NEXT:** WA-003 — Text Delivery API
 - **VPS DEPLOY:** NOT STARTED
 - **TARGET VPS:** `202.10.36.74`
 - **WORKFLOW:** local first -> verified -> checkpoint -> production

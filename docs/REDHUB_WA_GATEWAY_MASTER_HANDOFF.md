@@ -247,8 +247,8 @@ RedHub backend -> gateway -> WhatsApp untuk text/PDF serta reminder H-1 yang **d
 
 ## 12. Current Position
 
-**LAST PASS / LOCKED:** WA-001A — Scope Simplification / Delivery-Layer Lock  
-**IN PROGRESS:** WA-002 — WhatsApp Device & Persistent Session  
+**LAST PASS / LOCKED:** WA-002 — WhatsApp Device & Persistent Session  
+**IN PROGRESS:** none  
 **NEXT:** WA-003 — Text Delivery API  
 **PRODUCTION:** belum  
 **TARGET VPS:** 202.10.36.74
