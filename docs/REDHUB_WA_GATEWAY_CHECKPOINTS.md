@@ -122,25 +122,60 @@ The RedHub implementation is isolated under `redhub-gateway/` and its dedicated 
 ---
 
 ## WA-002 — WhatsApp Device & Persistent Session
-**Status: NEXT**
+**Status: IN PROGRESS**  
+**Branch:** `feat/redhub-wa-002-session`  
+**Implementation head:** `26eceab15455699893cd85fa573c9bd99a58bce5`
 
-### Required
-- Baileys provider adapter.
-- create/start device.
-- QR/pairing state.
-- connection state.
-- persistent auth/session.
-- reconnect logic.
-- device status.
-- restart survival.
+### Implemented
+- Baileys `7.0.0-rc14` provider runtime;
+- multi-file persistent auth state under dedicated session volume;
+- device state: DISCONNECTED / CONNECTING / PAIRING / CONNECTED / ERROR;
+- protected start/pair endpoint;
+- protected device status endpoint;
+- protected JSON QR state endpoint;
+- protected PNG QR endpoint for real scan testing;
+- tenant/device ID validation;
+- automatic reconnect for non-logout disconnect;
+- optional environment-driven auto-start after process/container restart;
+- graceful manager shutdown;
+- session/auth data remains outside Git;
+- API token required for all pairing/status routes.
+
+### Automated Verification
+GitHub Actions run **37171410041**: SUCCESS.
+- typecheck: PASS;
+- unit tests: PASS;
+- build: PASS;
+- Docker Compose build/start: PASS;
+- health/migration: PASS;
+- restart smoke: PASS.
+
+Unit tests verify:
+- pairing endpoints reject missing bearer token;
+- pairing start returns PAIRING state using fake manager;
+- protected status works;
+- protected QR JSON works;
+- protected QR PNG generation works.
+
+### Remaining Real-Device Gate
+WA-002 MUST NOT be marked PASS/LOCKED until:
+1. one real WhatsApp test number is paired;
+2. status reaches CONNECTED;
+3. session files exist only in persistent Docker volume;
+4. container restart reconnects without a new QR;
+5. disconnect/reconnect behavior is observed;
+6. logs are checked to confirm no QR/session credentials are emitted.
 
 ### Acceptance Criteria
-- nomor test berhasil pairing;
-- status CONNECTED valid;
-- container restart tidak membutuhkan pairing ulang;
-- disconnect/reconnect test lulus;
-- session directory tidak masuk Git;
-- credential/session tidak muncul di log.
+- real test number pairing: **PENDING USER-DEVICE TEST**;
+- status CONNECTED: **PENDING USER-DEVICE TEST**;
+- container restart without new pairing: **PENDING USER-DEVICE TEST**;
+- disconnect/reconnect: **PENDING USER-DEVICE TEST**;
+- session directory not in Git: PASS;
+- credential/session not intentionally logged: code review PASS; runtime log check pending real test.
+
+### Next Immediate Action
+Run the WA-002 local pairing procedure in `redhub-gateway/README.md` on a machine with Docker, then provide the status/output so the checkpoint can be verified and locked.
 
 ---
 
@@ -365,7 +400,8 @@ End-to-end dari dashboard RedHub sampai WhatsApp anggota.
 ## CURRENT POSITION
 
 - **LAST PASS / LOCKED:** WA-001 — Local Docker Foundation
-- **NEXT:** WA-002 — WhatsApp Device & Persistent Session
+- **IN PROGRESS:** WA-002 — WhatsApp Device & Persistent Session
+- **NEXT AFTER PASS:** WA-003 — Basic Sending
 - **VPS DEPLOY:** NOT STARTED
 - **REDHUB BACKEND CHANGE:** NOT STARTED BY DESIGN
 - **Rule:** jangan melompati checkpoint wajib.
