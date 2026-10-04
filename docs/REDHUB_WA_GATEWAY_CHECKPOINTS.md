@@ -499,25 +499,96 @@ Correlation, masked audit data, provider result, safe failures, timestamps, pers
 ---
 
 ## WA-007 — Security Gate
-**Status: PENDING**
+**Status: PASS / LOCKED**  
+**Date:** 2026-10-05  
+**Branch:** `feat/redhub-wa-007-security-gate`  
+**Security implementation commit:** `391c43b416d94ae9705d26aed9a6c5665cdd4e06`  
+**Compose hardening commit:** `d01ac40926a43a7fc31e927afca8e48d2b4733be`
 
-### Required
-- bearer auth;
-- payload validation;
-- tenant ownership checks;
-- PDF/document limit;
-- safe URL policy;
-- filename sanitation;
-- secret/session review;
-- log hygiene;
-- no anonymous send.
+### Implemented
+- bearer authentication remains mandatory for every endpoint except `GET /health`;
+- API token config rejects secrets shorter than 32 characters and placeholder values;
+- tenant/device IDs validated against bounded safe identifiers;
+- Fastify JSON body limit set to 64 KiB;
+- tenant ownership/cross-tenant protection preserved;
+- PDF maximum remains 10 MiB;
+- document source policy hardened against SSRF;
+- public document URLs require HTTPS by default;
+- HTTP/private/internal document hosts are accepted only when explicitly listed in `DOCUMENT_ALLOWED_HOSTS`;
+- URL credentials are rejected;
+- localhost/private/reserved IP targets are rejected unless the exact host is explicitly allowlisted;
+- DNS-resolved private/reserved addresses are rejected for non-allowlisted hosts;
+- redirects are manual, limited, and revalidated before every hop;
+- filename sanitation and PDF magic/MIME validation remain mandatory;
+- Authorization header configured for logger redaction;
+- libsignal/Baileys sensitive log suppression retained;
+- session directory permissions hardened to `700`;
+- session credential/key files hardened to `600`;
+- gateway container runs as non-root `app` user;
+- Compose no longer supplies weak fallback DB/API secrets or tenant/device defaults;
+- gateway host port remains loopback-only `127.0.0.1:3410`.
 
-### Acceptance
-- unauthorized rejected;
-- malformed payload rejected;
-- cross-tenant rejected;
-- secret scan clean;
-- session not tracked by Git.
+### Automated Verification
+Local source gate:
+- typecheck: PASS;
+- unit tests: **30/30 PASS**;
+- build: PASS.
+
+Docker image gate:
+- embedded typecheck/test/build: **30/30 PASS**;
+- Docker build: PASS;
+- Compose config validation: PASS;
+- gateway recreate: PASS.
+
+Security test coverage includes:
+- private/reserved IPv4/IPv6 rejection;
+- HTTPS-by-default document source policy;
+- explicit internal-host allowlist;
+- redirect-to-private rejection;
+- unsafe tenant/device ID rejection;
+- oversized JSON rejection;
+- existing bearer auth, cross-tenant, PDF limit, error safety, and log regression coverage.
+
+### Runtime Verification — 2026-10-05
+After security image activation:
+- `GET /health` -> HTTP 200;
+- Jember device -> `CONNECTED`;
+- `HAS_QR=false`;
+- session survived every security recreate without unpairing;
+- `DOCUMENT_ALLOWED_HOSTS=host.docker.internal` active for local test only;
+- API token length in runtime: 64;
+- weak token config test: rejected;
+- anonymous protected endpoint request -> HTTP 401 / `UNAUTHORIZED`;
+- container identity -> non-root `app`;
+- gateway host exposure -> `127.0.0.1:3410` only;
+- PostgreSQL has no published host port.
+
+### Session Permission Verification
+- `SESSION_DIR`: `700 app:app`;
+- tenant directory: `700 app:app`;
+- device directory: `700 app:app`;
+- `creds.json`: `600 app:app`;
+- unique mode for files in active session directory: `600`.
+
+### Safe URL Runtime Verification
+Tests were performed without sending WhatsApp messages:
+- direct private source `127.0.0.1` -> `400 INVALID_DOCUMENT_SOURCE`;
+- explicitly allowlisted `host.docker.internal` source was fetched successfully, then test stopped at intentionally invalid phone -> `400 INVALID_PHONE`;
+- allowlisted source redirecting to private IP -> `400 INVALID_DOCUMENT_SOURCE`;
+- non-allowlisted public HTTP URL -> `400 INVALID_DOCUMENT_SOURCE`.
+
+### Secret / Git / Log Verification
+- local `.env` is ignored by Git;
+- local `.env` is not tracked;
+- WhatsApp session/credential paths are not tracked;
+- previous local development API token is not present in Git;
+- Authorization leak marker produced HTTP 401 and was absent from gateway logs;
+- sensitive-log scan found no libsignal key material, API token, or bearer header.
+
+### Acceptance Result
+**PASS / LOCKED**
+
+Bearer auth, payload validation, tenant ownership, PDF/document limits, SSRF protection, filename sanitation, secret/session handling, runtime permissions, non-root execution, loopback-only exposure, and log hygiene are verified.
 
 ---
 
@@ -596,9 +667,9 @@ Histori tidak dihapus; digantikan oleh WA-001A atas instruksi eksplisit user.
 
 ## CURRENT POSITION
 
-- **LAST PASS / LOCKED:** WA-006 — Minimal Delivery Log & Error Contract
+- **LAST PASS / LOCKED:** WA-007 — Security Gate
 - **IN PROGRESS:** none
-- **NEXT:** WA-007 — Security Gate
+- **NEXT:** WA-008 — Local RedHub Contract Validation
 - **VPS DEPLOY:** NOT STARTED
 - **TARGET VPS:** `202.10.36.74`
 - **WORKFLOW:** local first -> verified -> checkpoint -> production

@@ -149,15 +149,21 @@ Contoh PDF:
 ## 8. Security
 
 - internal bearer authentication;
+- API token minimal 32 karakter dan bukan placeholder;
 - tidak ada anonymous send endpoint;
-- validate tenant ownership;
+- validate tenant/device ID dan ownership;
 - validate phone;
 - validate document source;
-- limit ukuran document;
+- public document URL wajib HTTPS secara default;
+- private/internal HTTP hanya melalui exact host allowlist `DOCUMENT_ALLOWED_HOSTS`;
+- redirect document URL selalu divalidasi ulang;
+- limit ukuran document 10 MiB;
+- request body dibatasi;
 - no secret/session in Git/log;
-- session volume permission ketat;
-- private network/localhost diprioritaskan bila RedHub dan gateway co-located;
-- HTTPS/reverse proxy hanya bila endpoint perlu diekspos.
+- Authorization header di-redact;
+- session directory `700`, credential/key files `600`;
+- container gateway berjalan non-root;
+- host port gateway tetap loopback-only sampai deployment architecture menyatakan lain.
 
 ## 9. Local-First Strategy
 
@@ -223,11 +229,8 @@ Tenant-scoped runtime registry/session paths, legacy session migration, implicit
 Correlation/request ID, masked destination audit, provider ID, SENT/FAILED, safe error, timestamp, and audit failure isolation verified.
 
 ### WA-007 — Security Gate
-- bearer auth;
-- validation;
-- secret/session review;
-- document limits;
-- log hygiene.
+**PASS / LOCKED**
+Bearer auth, payload validation, tenant ownership, document SSRF protection, PDF limits, filename sanitation, strong runtime secrets, session permissions, non-root execution, loopback exposure, Git secret/session review, and log hygiene verified.
 
 ### WA-008 — Local RedHub Contract Validation
 Backend RedHub memanggil gateway dengan payload text/PDF tanpa memindahkan broadcast/reminder logic.
@@ -240,9 +243,9 @@ RedHub backend -> gateway -> WhatsApp untuk text/PDF serta reminder H-1 yang **d
 
 ## 12. Current Position
 
-**LAST PASS / LOCKED:** WA-006 — Minimal Delivery Log & Error Contract  
+**LAST PASS / LOCKED:** WA-007 — Security Gate  
 **IN PROGRESS:** none  
-**NEXT:** WA-007 — Security Gate  
+**NEXT:** WA-008 — Local RedHub Contract Validation  
 **PRODUCTION:** belum  
 **TARGET VPS:** 202.10.36.74
 

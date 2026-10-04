@@ -116,7 +116,8 @@ VPS lama `202.10.45.147` tidak disentuh kecuali ada instruksi eksplisit.
 - WA-004 — PDF / Document Delivery API — PASS / LOCKED
 - WA-005 — Multi-Tenant Isolation — PASS / LOCKED
 - WA-006 — Minimal Delivery Log & Error Contract — PASS / LOCKED
-- WA-007 — Security Gate — NEXT
+- WA-007 — Security Gate — PASS / LOCKED
+- WA-008 — Local RedHub Contract Validation — NEXT
 - Production deploy — NOT STARTED
 
 ## Mandatory Workflow
@@ -135,12 +136,11 @@ Tidak boleh mengklaim PASS tanpa verifikasi.
 
 ## Next Action
 
-Kerjakan **WA-007 — Security Gate** di local:
-- bearer authentication;
-- malformed payload rejection;
-- tenant ownership/cross-tenant rejection;
-- PDF source/size/filename safeguards;
-- secret/session Git review;
-- log hygiene and no anonymous send.
+Kerjakan **WA-008 — Local RedHub Contract Validation**:
+- backend RedHub memanggil text delivery contract;
+- backend RedHub memanggil PDF/document delivery contract;
+- tenant mapping tervalidasi;
+- gateway result/error bisa dikonsumsi backend;
+- broadcast/reminder H-1 tetap milik backend RedHub.
 
-Jangan deploy VPS sebelum local gate WA-007 sampai WA-008 selesai.
+Jangan deploy VPS sebelum WA-008 PASS / LOCKED.

@@ -469,3 +469,43 @@ Reason:
 turning the response into failure after a successful WhatsApp send could cause RedHub to retry and duplicate the message.
 
 Audit persistence failure is logged safely without destination or credential data.
+
+
+## RHWA-D-051 — Document Fetch Is SSRF-Protected by Default
+WA-007 locks document source policy as follows:
+- non-allowlisted/public sources require HTTPS;
+- URL credentials are rejected;
+- localhost/private/reserved IP targets are rejected;
+- DNS results for non-allowlisted hosts must not resolve to private/reserved addresses;
+- redirects are followed manually and every redirect target is revalidated;
+- redirect count is bounded.
+
+Internal/private HTTP is allowed only when the exact hostname is explicitly configured in `DOCUMENT_ALLOWED_HOSTS`.
+
+This keeps the gateway simple while preventing arbitrary document URLs from becoming access to local metadata/services.
+
+## RHWA-D-052 — Runtime Secrets Have No Weak Compose Defaults
+Production/runtime-critical values must be supplied explicitly.
+
+Locked rules:
+- `API_TOKEN_SECRET` is required and must be at least 32 characters;
+- placeholder API token values are rejected;
+- Compose must not fall back to a built-in API token or PostgreSQL password;
+- deployment tenant/device IDs must be supplied explicitly rather than defaulting core architecture to Jember.
+
+## RHWA-D-053 — WhatsApp Session Credentials Use Restricted Permissions
+Persistent WhatsApp session storage is sensitive credential material.
+
+Locked permissions:
+- session root / tenant / device directories: `700`;
+- credential/key files: `600`;
+- gateway container process runs as non-root `app` user.
+
+Permission hardening is applied at startup and after credential/message state changes.
+
+## RHWA-D-054 — Internal API Logs Must Not Expose Authorization
+Gateway logger configuration redacts `req.headers.authorization`.
+
+The existing Baileys/libsignal sensitive-session logging suppression remains mandatory.
+
+Local security verification must include a marker-based log scan before WA-007 can be locked.

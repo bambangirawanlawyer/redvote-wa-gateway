@@ -193,16 +193,20 @@ For a tenant with exactly one device, `deviceId` may be omitted.
 
 Gateway behavior:
 1. validate tenant/device ownership before document fetch when an explicit device is supplied;
-2. require HTTP/HTTPS URL;
-3. fetch as a streamed response;
-4. require `application/pdf`;
-5. reject over 10 MB, including early cancellation when stream exceeds the limit;
-6. verify PDF magic `%PDF-`;
-7. sanitize filename and add `.pdf` when necessary;
-8. validate optional caption length;
-9. keep the PDF in memory only;
-10. send as WhatsApp document with `application/pdf`;
-11. return provider result.
+2. reject URL credentials and malformed/oversized source URLs;
+3. require HTTPS for non-allowlisted/public sources;
+4. allow internal/private HTTP only for an exact hostname configured in `DOCUMENT_ALLOWED_HOSTS`;
+5. reject localhost/private/reserved address targets for non-allowlisted sources, including DNS-resolved targets;
+6. process redirects manually and revalidate every redirect target, with a bounded redirect count;
+7. fetch as a streamed response;
+8. require `application/pdf`;
+9. reject over 10 MB, including early cancellation when stream exceeds the limit;
+10. verify PDF magic `%PDF-`;
+11. sanitize filename and add `.pdf` when necessary;
+12. validate optional caption length;
+13. keep the PDF in memory only;
+14. send as WhatsApp document with `application/pdf`;
+15. return provider result.
 
 The gateway is not a permanent document archive.
 
@@ -239,6 +243,9 @@ SESSION_DIR/
 Rules:
 - session credentials live in persistent Docker storage;
 - session credentials never enter Git;
+- session root/tenant/device directories use mode `700`;
+- session credential/key files use mode `600`;
+- gateway process runs as non-root application user;
 - WA-005 migrates the previous legacy single-level session path into the tenant/device layout;
 - persisted tenant sessions are discovered and started during gateway startup;
 - a valid paired session must reconnect without a new QR after container restart.
