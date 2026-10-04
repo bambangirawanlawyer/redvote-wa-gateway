@@ -178,5 +178,69 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
     }
   );
 
+  app.post(
+    '/api/v1/messages/text',
+    { preHandler: requireInternalAuth },
+    async (request, reply) => {
+      const body = (request.body ?? {}) as {
+        tenantId?: string;
+        deviceId?: string;
+        to?: string;
+        text?: string;
+        requestId?: string;
+      };
+
+      if (!body.tenantId || !body.deviceId || !body.to || !body.text) {
+        return reply.code(400).send({
+          success: false,
+          requestId: body.requestId,
+          error: {
+            code: 'INVALID_REQUEST',
+            message: 'tenantId, deviceId, to, and text are required'
+          }
+        });
+      }
+
+      try {
+        const result = await options.devices.sendText({
+          tenantId: body.tenantId,
+          deviceId: body.deviceId,
+          to: body.to,
+          text: body.text
+        });
+
+        return reply.code(200).send({
+          success: true,
+          tenantId: result.tenantId,
+          deviceId: result.deviceId,
+          to: result.to,
+          providerMessageId: result.providerMessageId,
+          requestId: body.requestId
+        });
+      } catch (error) {
+        const code = error instanceof Error ? error.message : 'PROVIDER_ERROR';
+        const statusCode =
+          code === 'DEVICE_NOT_FOUND'
+            ? 404
+            : code === 'DEVICE_TENANT_MISMATCH'
+              ? 403
+              : code === 'DEVICE_NOT_CONNECTED'
+                ? 409
+                : code === 'INVALID_PHONE' || code === 'INVALID_TEXT'
+                  ? 400
+                  : 502;
+
+        return reply.code(statusCode).send({
+          success: false,
+          requestId: body.requestId,
+          error: {
+            code,
+            message: 'Unable to send WhatsApp text message'
+          }
+        });
+      }
+    }
+  );
+
   return app;
 }

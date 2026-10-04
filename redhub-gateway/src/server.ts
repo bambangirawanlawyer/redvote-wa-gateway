@@ -5,6 +5,29 @@ import { createPool } from './db.js';
 import { runMigrations } from './migrate.js';
 import { BaileysDeviceManager } from './whatsapp/manager.js';
 
+const sensitiveLibsignalLogPrefixes = new Set([
+  'Closing session:',
+  'Opening session:',
+  'Removing old closed session:',
+  'Session already closed'
+]);
+
+function suppressSensitiveLibsignalSessionLogs(): void {
+  const originalInfo = console.info.bind(console);
+  const originalWarn = console.warn.bind(console);
+  const isSensitive = (args: unknown[]): boolean =>
+    typeof args[0] === 'string' && sensitiveLibsignalLogPrefixes.has(args[0]);
+
+  console.info = (...args: unknown[]) => {
+    if (!isSensitive(args)) originalInfo(...args);
+  };
+  console.warn = (...args: unknown[]) => {
+    if (!isSensitive(args)) originalWarn(...args);
+  };
+}
+
+suppressSensitiveLibsignalSessionLogs();
+
 const config = loadConfig();
 const pool = createPool(config.databaseUrl);
 

@@ -11,6 +11,8 @@ import makeWASocket, {
 import type {
   DeviceConnectionStatus,
   DeviceSnapshot,
+  SendTextInput,
+  SendTextResult,
   StartDeviceInput,
   WhatsAppDeviceManager
 } from './types.js';
@@ -52,6 +54,36 @@ export class BaileysDeviceManager implements WhatsAppDeviceManager {
 
   getQr(deviceId: string): string | undefined {
     return this.devices.get(deviceId)?.qr;
+  }
+
+  async sendText(input: SendTextInput): Promise<SendTextResult> {
+    this.validateId(input.deviceId, 'deviceId');
+    this.validateId(input.tenantId, 'tenantId');
+
+    const runtime = this.devices.get(input.deviceId);
+    if (!runtime) throw new Error('DEVICE_NOT_FOUND');
+    if (runtime.tenantId !== input.tenantId) {
+      throw new Error('DEVICE_TENANT_MISMATCH');
+    }
+    if (runtime.status !== 'CONNECTED' || !runtime.socket) {
+      throw new Error('DEVICE_NOT_CONNECTED');
+    }
+
+    const to = this.normalizeDestination(input.to);
+    const text = input.text.trim();
+    if (!text || text.length > 4096) throw new Error('INVALID_TEXT');
+
+    try {
+      const result = await runtime.socket.sendMessage(`${to}@s.whatsapp.net`, { text });
+      return {
+        tenantId: runtime.tenantId,
+        deviceId: runtime.deviceId,
+        to,
+        providerMessageId: result?.key.id ?? undefined
+      };
+    } catch {
+      throw new Error('PROVIDER_ERROR');
+    }
   }
 
   async start(input: StartDeviceInput): Promise<DeviceSnapshot> {
@@ -202,6 +234,13 @@ export class BaileysDeviceManager implements WhatsAppDeviceManager {
     if (!SAFE_ID.test(value)) {
       throw new Error(`INVALID_${field.toUpperCase()}`);
     }
+  }
+
+  private normalizeDestination(value: string): string {
+    let normalized = value.trim().replace(/[\s()+.\-]/g, '');
+    if (normalized.startsWith('0')) normalized = `62${normalized.slice(1)}`;
+    if (!/^\d{8,15}$/.test(normalized)) throw new Error('INVALID_PHONE');
+    return normalized;
   }
 
   private normalizeUserId(value?: string): string | undefined {
