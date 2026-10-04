@@ -523,3 +523,15 @@ WA-008 exit requires access to the actual RedHub backend source/runtime and veri
 - reminder H-1 remains triggered by RedHub.
 
 Until that source/runtime is accessible, WA-008 is BLOCKED and WA-009 production deployment must not start.
+
+
+## RHWA-D-056 — Standalone Production Deployment May Proceed While WA-008 Is Deferred
+On 2026-10-05 the user explicitly approved continuing WA Gateway deployment even though the actual RedHub backend repository/runtime could not be found.
+
+Locked interpretation:
+- WA-008 remains **DEFERRED / EXTERNAL DEPENDENCY** and is not PASS;
+- WA-009 standalone gateway production deployment may proceed;
+- WA-009 validates the gateway itself, session persistence, networking, security, backup and direct text/PDF delivery;
+- WA-010 production end-to-end remains blocked until the actual RedHub backend is integrated;
+- the old VPS `202.10.45.147` must not be touched;
+- the WA-009 target is `202.10.36.74`.

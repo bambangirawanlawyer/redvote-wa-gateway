@@ -233,7 +233,7 @@ Correlation/request ID, masked destination audit, provider ID, SENT/FAILED, safe
 Bearer auth, payload validation, tenant ownership, document SSRF protection, PDF limits, filename sanitation, strong runtime secrets, session permissions, non-root execution, loopback exposure, Git secret/session review, and log hygiene verified.
 
 ### WA-008 — Local RedHub Contract Validation
-**BLOCKED — actual RedHub backend source/runtime unavailable**
+**DEFERRED / EXTERNAL DEPENDENCY — actual RedHub backend source/runtime unavailable**
 
 Gateway-side contract harness and integration guide are ready:
 - `docs/REDHUB_BACKEND_INTEGRATION.md`;
@@ -244,7 +244,9 @@ Non-sending smoke against the real local gateway passes health, tenant mapping, 
 WA-008 may only be locked after the actual RedHub backend is accessible and verified to call text/PDF delivery while keeping broadcast/reminder H-1 orchestration in RedHub.
 
 ### WA-009 — VPS Deployment
-Deploy ke `202.10.36.74`, persistent volume, firewall/private networking, restart test, backup baseline.
+**IN PROGRESS — standalone gateway deployment explicitly approved while WA-008 is deferred.**
+
+Deploy ke `202.10.36.74`, persistent volume, firewall/private networking, restart test, backup baseline. VPS lama `202.10.45.147` tidak boleh disentuh.
 
 ### WA-010 — Production End-to-End
 RedHub backend -> gateway -> WhatsApp untuk text/PDF serta reminder H-1 yang **dipicu oleh RedHub backend**.
@@ -252,9 +254,10 @@ RedHub backend -> gateway -> WhatsApp untuk text/PDF serta reminder H-1 yang **d
 ## 12. Current Position
 
 **LAST PASS / LOCKED:** WA-007 — Security Gate  
-**BLOCKED:** WA-008 — Local RedHub Contract Validation (actual RedHub backend unavailable)  
-**NEXT AFTER UNBLOCK:** WA-009 — Production Deployment  
-**PRODUCTION:** belum  
+**DEFERRED:** WA-008 — Local RedHub Contract Validation (actual RedHub backend unavailable)  
+**IN PROGRESS:** WA-009 — Production Deployment  
+**WA-010:** blocked until WA-008 actual RedHub integration is completed  
+**PRODUCTION:** deployment in progress  
 **TARGET VPS:** 202.10.36.74
 
 ## 13. Handoff Rule

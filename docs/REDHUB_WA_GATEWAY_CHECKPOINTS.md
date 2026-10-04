@@ -593,7 +593,7 @@ Bearer auth, payload validation, tenant ownership, PDF/document limits, SSRF pro
 ---
 
 ## WA-008 — Local RedHub Contract Validation
-**Status: BLOCKED**  
+**Status: DEFERRED / EXTERNAL DEPENDENCY**  
 **Date:** 2026-10-05  
 **Branch:** `feat/redhub-wa-008-redhub-contract`  
 **Gateway contract harness commit:** `5468595bf3270f95585ce5fb3bde1e4540e7d29e`
@@ -650,13 +650,17 @@ Required handoff to unblock:
 - run actual backend -> gateway integration tests;
 - verify broadcast/reminder ownership remains in RedHub.
 
-### Safety
-Do **not** start WA-009 production deployment while WA-008 remains BLOCKED.
+### Deployment Decision — 2026-10-05
+User explicitly chose to continue standalone gateway deployment even though the RedHub backend repository is unavailable.
+
+WA-008 remains **not PASS** and is deferred as an external dependency. It does **not** block WA-009 standalone gateway deployment. WA-010 production end-to-end with RedHub remains blocked until WA-008 is completed.
 
 ---
 
 ## WA-009 — Production Deployment
-**Status: PENDING**
+**Status: IN PROGRESS**  
+**Date:** 2026-10-05  
+**Branch:** `feat/redhub-wa-009-vps-deploy`
 
 ### Target
 VPS `202.10.36.74`.
@@ -716,8 +720,9 @@ Histori tidak dihapus; digantikan oleh WA-001A atas instruksi eksplisit user.
 ## CURRENT POSITION
 
 - **LAST PASS / LOCKED:** WA-007 — Security Gate
-- **BLOCKED:** WA-008 — Local RedHub Contract Validation (actual RedHub backend unavailable)
-- **NEXT AFTER UNBLOCK:** WA-009 — Production Deployment
-- **VPS DEPLOY:** NOT STARTED
+- **DEFERRED:** WA-008 — Local RedHub Contract Validation (actual RedHub backend unavailable)
+- **IN PROGRESS:** WA-009 — Production Deployment
+- **WA-010:** blocked until WA-008 actual RedHub integration is completed
+- **VPS DEPLOY:** IN PROGRESS
 - **TARGET VPS:** `202.10.36.74`
 - **WORKFLOW:** local first -> verified -> checkpoint -> production
