@@ -1,4 +1,4 @@
-import { timingSafeEqual } from 'node:crypto';
+import { randomUUID, timingSafeEqual } from 'node:crypto';
 import { basename } from 'node:path';
 import Fastify, {
   type FastifyInstance,
@@ -6,6 +6,10 @@ import Fastify, {
   type FastifyRequest
 } from 'fastify';
 import QRCode from 'qrcode';
+import {
+  insertDeliveryLog,
+  type DeliveryLogInput
+} from './delivery-log.js';
 import type { WhatsAppDeviceManager } from './whatsapp/types.js';
 
 export type HealthDatabase = {
@@ -98,6 +102,24 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
   const app = Fastify({
     logger: options.logger ?? true
   });
+
+  async function recordDeliveryLogSafe(input: DeliveryLogInput): Promise<void> {
+    try {
+      await insertDeliveryLog(options.db, input);
+    } catch {
+      app.log.error(
+        {
+          requestId: input.requestId,
+          tenantId: input.tenantId,
+          deviceId: input.deviceId,
+          messageType: input.messageType,
+          result: input.result,
+          errorCode: input.errorCode
+        },
+        'delivery log persistence failed'
+      );
+    }
+  }
 
   async function requireInternalAuth(
     request: FastifyRequest,
@@ -310,6 +332,18 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
         });
       }
 
+      const requestId = body.requestId?.trim() || randomUUID();
+      if (requestId.length > 128) {
+        return reply.code(400).send({
+          success: false,
+          requestId,
+          error: {
+            code: 'INVALID_REQUEST_ID',
+            message: 'requestId is too long'
+          }
+        });
+      }
+
       try {
         const result = await options.devices.sendText({
           tenantId: body.tenantId,
@@ -318,13 +352,23 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
           text: body.text
         });
 
+        await recordDeliveryLogSafe({
+          requestId,
+          tenantId: result.tenantId,
+          deviceId: result.deviceId,
+          messageType: 'TEXT',
+          destination: body.to,
+          providerMessageId: result.providerMessageId,
+          result: 'SENT'
+        });
+
         return reply.code(200).send({
           success: true,
           tenantId: result.tenantId,
           deviceId: result.deviceId,
           to: result.to,
           providerMessageId: result.providerMessageId,
-          requestId: body.requestId
+          requestId
         });
       } catch (error) {
         const code = error instanceof Error ? error.message : 'PROVIDER_ERROR';
@@ -338,13 +382,25 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
                 : code === 'DEVICE_REQUIRED' || code === 'INVALID_PHONE' || code === 'INVALID_TEXT'
                   ? 400
                   : 502;
+        const safeMessage = 'Unable to send WhatsApp text message';
+
+        await recordDeliveryLogSafe({
+          requestId,
+          tenantId: body.tenantId,
+          deviceId: body.deviceId,
+          messageType: 'TEXT',
+          destination: body.to,
+          result: 'FAILED',
+          errorCode: code,
+          errorMessage: safeMessage
+        });
 
         return reply.code(statusCode).send({
           success: false,
-          requestId: body.requestId,
+          requestId,
           error: {
             code,
-            message: 'Unable to send WhatsApp text message'
+            message: safeMessage
           }
         });
       }
@@ -372,6 +428,18 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
           error: {
             code: 'INVALID_REQUEST',
             message: 'tenantId, to, documentUrl, and filename are required'
+          }
+        });
+      }
+
+      const requestId = body.requestId?.trim() || randomUUID();
+      if (requestId.length > 128) {
+        return reply.code(400).send({
+          success: false,
+          requestId,
+          error: {
+            code: 'INVALID_REQUEST_ID',
+            message: 'requestId is too long'
           }
         });
       }
@@ -411,6 +479,16 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
           caption: caption || undefined
         });
 
+        await recordDeliveryLogSafe({
+          requestId,
+          tenantId: result.tenantId,
+          deviceId: result.deviceId,
+          messageType: 'DOCUMENT',
+          destination: body.to,
+          providerMessageId: result.providerMessageId,
+          result: 'SENT'
+        });
+
         return reply.code(200).send({
           success: true,
           tenantId: result.tenantId,
@@ -418,7 +496,7 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
           to: result.to,
           filename,
           providerMessageId: result.providerMessageId,
-          requestId: body.requestId
+          requestId
         });
       } catch (error) {
         const code = error instanceof Error ? error.message : 'PROVIDER_ERROR';
@@ -432,21 +510,33 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
                 : code === 'DEVICE_REQUIRED'
                   ? 400
                   : code === 'DOCUMENT_TOO_LARGE'
-                  ? 413
-                  : code === 'INVALID_PHONE' ||
-                      code === 'INVALID_DOCUMENT_SOURCE' ||
-                      code === 'INVALID_DOCUMENT_FILENAME' ||
-                      code === 'INVALID_DOCUMENT_CAPTION' ||
-                      code === 'UNSUPPORTED_DOCUMENT_TYPE'
-                    ? 400
-                    : 502;
+                    ? 413
+                    : code === 'INVALID_PHONE' ||
+                        code === 'INVALID_DOCUMENT_SOURCE' ||
+                        code === 'INVALID_DOCUMENT_FILENAME' ||
+                        code === 'INVALID_DOCUMENT_CAPTION' ||
+                        code === 'UNSUPPORTED_DOCUMENT_TYPE'
+                      ? 400
+                      : 502;
+        const safeMessage = 'Unable to send WhatsApp PDF document';
+
+        await recordDeliveryLogSafe({
+          requestId,
+          tenantId: body.tenantId,
+          deviceId: body.deviceId,
+          messageType: 'DOCUMENT',
+          destination: body.to,
+          result: 'FAILED',
+          errorCode: code,
+          errorMessage: safeMessage
+        });
 
         return reply.code(statusCode).send({
           success: false,
-          requestId: body.requestId,
+          requestId,
           error: {
             code,
-            message: 'Unable to send WhatsApp PDF document'
+            message: safeMessage
           }
         });
       }

@@ -818,3 +818,226 @@ test('multi-device tenant requires explicit deviceId', async () => {
     await app.close();
   }
 });
+
+
+test('text delivery writes masked SENT audit log and generates requestId', async () => {
+  const devices = new FakeDeviceManager();
+  devices.connectForTest();
+  const calls: Array<{ sql: string; params?: unknown[] }> = [];
+  const db: HealthDatabase = {
+    query: async (sql, params) => {
+      calls.push({ sql, params });
+      return { rows: [] };
+    }
+  };
+  const app = buildApp({
+    db,
+    devices,
+    apiTokenSecret: 'test-secret',
+    logger: false
+  });
+
+  try {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/v1/messages/text',
+      headers: { authorization: 'Bearer test-secret' },
+      payload: {
+        tenantId: 'jember',
+        deviceId: 'jember-main',
+        to: '628123456789',
+        text: 'WA-006 log success'
+      }
+    });
+
+    assert.equal(response.statusCode, 200);
+    assert.equal(response.json().success, true);
+    assert.match(response.json().requestId, /^[0-9a-f-]{36}$/i);
+
+    const insert = calls.find((call) => call.sql.includes('INSERT INTO delivery_logs'));
+    assert.ok(insert);
+    assert.equal(insert.params?.[0], response.json().requestId);
+    assert.equal(insert.params?.[1], 'jember');
+    assert.equal(insert.params?.[2], 'jember-main');
+    assert.equal(insert.params?.[3], 'TEXT');
+    assert.equal(insert.params?.[4], '6281*****789');
+    assert.notEqual(insert.params?.[4], '628123456789');
+    assert.equal(insert.params?.[5], 'fake-provider-message-id');
+    assert.equal(insert.params?.[6], 'SENT');
+    assert.equal(insert.params?.[7], null);
+  } finally {
+    await app.close();
+  }
+});
+
+test('failed text delivery writes masked FAILED audit log with safe error', async () => {
+  const devices = new FakeDeviceManager();
+  devices.connectForTest();
+  const calls: Array<{ sql: string; params?: unknown[] }> = [];
+  const db: HealthDatabase = {
+    query: async (sql, params) => {
+      calls.push({ sql, params });
+      return { rows: [] };
+    }
+  };
+  const app = buildApp({
+    db,
+    devices,
+    apiTokenSecret: 'test-secret',
+    logger: false
+  });
+
+  try {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/v1/messages/text',
+      headers: { authorization: 'Bearer test-secret' },
+      payload: {
+        tenantId: 'jember',
+        deviceId: 'jember-main',
+        to: 'invalid',
+        text: 'WA-006 failure',
+        requestId: 'wa006-failure-001'
+      }
+    });
+
+    assert.equal(response.statusCode, 400);
+    assert.equal(response.json().error.code, 'INVALID_PHONE');
+
+    const insert = calls.find((call) => call.sql.includes('INSERT INTO delivery_logs'));
+    assert.ok(insert);
+    assert.equal(insert.params?.[0], 'wa006-failure-001');
+    assert.equal(insert.params?.[3], 'TEXT');
+    assert.equal(insert.params?.[4], '***');
+    assert.equal(insert.params?.[6], 'FAILED');
+    assert.equal(insert.params?.[7], 'INVALID_PHONE');
+    assert.equal(insert.params?.[8], 'Unable to send WhatsApp text message');
+  } finally {
+    await app.close();
+  }
+});
+
+test('document delivery writes DOCUMENT audit log', async () => {
+  const devices = new FakeDeviceManager();
+  devices.connectForTest();
+  const calls: Array<{ sql: string; params?: unknown[] }> = [];
+  const db: HealthDatabase = {
+    query: async (sql, params) => {
+      calls.push({ sql, params });
+      return { rows: [] };
+    }
+  };
+  const app = buildApp({
+    db,
+    devices,
+    apiTokenSecret: 'test-secret',
+    logger: false
+  });
+  const originalFetch = globalThis.fetch;
+  const pdf = Buffer.from('%PDF-1.4\n%%EOF\n');
+
+  globalThis.fetch = (async () =>
+    new Response(pdf, {
+      status: 200,
+      headers: { 'content-type': 'application/pdf' }
+    })) as typeof fetch;
+
+  try {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/v1/messages/document',
+      headers: { authorization: 'Bearer test-secret' },
+      payload: {
+        tenantId: 'jember',
+        deviceId: 'jember-main',
+        to: '628123456789',
+        documentUrl: 'https://example.test/wa006.pdf',
+        filename: 'wa006.pdf',
+        requestId: 'wa006-document-001'
+      }
+    });
+
+    assert.equal(response.statusCode, 200);
+    const insert = calls.find((call) => call.sql.includes('INSERT INTO delivery_logs'));
+    assert.ok(insert);
+    assert.equal(insert.params?.[0], 'wa006-document-001');
+    assert.equal(insert.params?.[3], 'DOCUMENT');
+    assert.equal(insert.params?.[4], '6281*****789');
+    assert.equal(insert.params?.[5], 'fake-document-message-id');
+    assert.equal(insert.params?.[6], 'SENT');
+  } finally {
+    globalThis.fetch = originalFetch;
+    await app.close();
+  }
+});
+
+test('delivery log database failure does not turn successful send into failure', async () => {
+  const devices = new FakeDeviceManager();
+  devices.connectForTest();
+  const db: HealthDatabase = {
+    query: async (sql) => {
+      if (sql.includes('INSERT INTO delivery_logs')) {
+        throw new Error('audit database unavailable');
+      }
+      return { rows: [] };
+    }
+  };
+  const app = buildApp({
+    db,
+    devices,
+    apiTokenSecret: 'test-secret',
+    logger: false
+  });
+
+  try {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/v1/messages/text',
+      headers: { authorization: 'Bearer test-secret' },
+      payload: {
+        tenantId: 'jember',
+        deviceId: 'jember-main',
+        to: '628123456789',
+        text: 'WA-006 audit failure isolation',
+        requestId: 'wa006-audit-failure'
+      }
+    });
+
+    assert.equal(response.statusCode, 200);
+    assert.equal(response.json().success, true);
+    assert.equal(response.json().requestId, 'wa006-audit-failure');
+  } finally {
+    await app.close();
+  }
+});
+
+test('delivery endpoint rejects overlong requestId', async () => {
+  const devices = new FakeDeviceManager();
+  devices.connectForTest();
+  const app = buildApp({
+    db: healthyDb(),
+    devices,
+    apiTokenSecret: 'test-secret',
+    logger: false
+  });
+
+  try {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/v1/messages/text',
+      headers: { authorization: 'Bearer test-secret' },
+      payload: {
+        tenantId: 'jember',
+        deviceId: 'jember-main',
+        to: '628123456789',
+        text: 'WA-006 request id limit',
+        requestId: 'x'.repeat(129)
+      }
+    });
+
+    assert.equal(response.statusCode, 400);
+    assert.equal(response.json().error.code, 'INVALID_REQUEST_ID');
+  } finally {
+    await app.close();
+  }
+});
