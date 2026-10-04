@@ -3,15 +3,23 @@ import { buildApp } from './app.js';
 import { loadConfig } from './config.js';
 import { createPool } from './db.js';
 import { runMigrations } from './migrate.js';
+import { BaileysDeviceManager } from './whatsapp/manager.js';
 
 const config = loadConfig();
 const pool = createPool(config.databaseUrl);
 
-await mkdir(config.sessionDir, { recursive: true });
+await mkdir(config.sessionDir, { recursive: true, mode: 0o700 });
 await runMigrations(pool);
+
+const devices = new BaileysDeviceManager({
+  sessionDir: config.sessionDir,
+  reconnectDelayMs: config.whatsappReconnectDelayMs
+});
 
 const app = buildApp({
   db: pool,
+  devices,
+  apiTokenSecret: config.apiTokenSecret,
   logger: { level: config.logLevel },
   serviceVersion: config.serviceVersion
 });
@@ -25,6 +33,7 @@ async function shutdown(signal: string): Promise<void> {
   app.log.info({ signal }, 'graceful shutdown started');
 
   try {
+    await devices.shutdown();
     await app.close();
     await pool.end();
     app.log.info('graceful shutdown completed');
@@ -40,17 +49,37 @@ process.on('SIGTERM', () => void shutdown('SIGTERM'));
 
 try {
   await app.listen({ host: config.host, port: config.port });
+
+  if (config.autoStartWhatsApp) {
+    void devices
+      .start({
+        tenantId: config.defaultTenantId,
+        deviceId: config.defaultDeviceId
+      })
+      .catch(() => {
+        app.log.error(
+          {
+            deviceId: config.defaultDeviceId,
+            tenantId: config.defaultTenantId
+          },
+          'WhatsApp auto-start failed'
+        );
+      });
+  }
+
   app.log.info(
     {
       host: config.host,
       port: config.port,
       nodeEnv: config.nodeEnv,
-      sessionDir: config.sessionDir
+      sessionDir: config.sessionDir,
+      autoStartWhatsApp: config.autoStartWhatsApp
     },
     'redhub wa gateway started'
   );
 } catch (error) {
   app.log.error({ err: error }, 'startup failed');
+  await devices.shutdown();
   await pool.end();
   process.exit(1);
 }
