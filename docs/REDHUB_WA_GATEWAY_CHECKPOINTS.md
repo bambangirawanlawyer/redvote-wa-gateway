@@ -424,19 +424,77 @@ Tenant ownership, tenant-scoped session paths, default-device behavior, future m
 ---
 
 ## WA-006 — Minimal Delivery Log & Error Contract
-**Status: PENDING**
+**Status: PASS / LOCKED**  
+**Date:** 2026-10-05  
+**Branch:** `feat/redhub-wa-006-delivery-log`  
+**Implementation commit:** `4b5d560c7a95d3d9604ad261bf91269917f0b856`
 
-### Required
-- request/correlation ID;
-- tenant;
-- destination masked in logs;
-- provider message ID;
-- result SENT/FAILED;
-- safe error code/message;
-- timestamp.
+### Implemented
+- migration `002_delivery_logs.sql`;
+- PostgreSQL `delivery_logs` table for operational audit only;
+- correlation `requestId` preserved when supplied;
+- UUID requestId generated when omitted;
+- requestId bounded to 128 characters;
+- tenant/device/message type recorded;
+- destination stored **masked only**;
+- provider message ID stored on successful delivery;
+- result `SENT` / `FAILED`;
+- safe error code and generic safe error message;
+- database timestamp `created_at`;
+- text and PDF/document delivery both covered;
+- audit-log persistence failure is isolated and does not convert a successful WhatsApp send into failure.
+
+### Automated Verification
+Local gate:
+- typecheck: PASS;
+- unit tests: **25/25 PASS**;
+- build: PASS.
+
+Docker gate:
+- Docker build: PASS;
+- embedded typecheck/test/build: **25/25 PASS**;
+- gateway recreate: PASS;
+- Jember session returned to `CONNECTED` with `HAS_QR=false`.
+
+### Database Verification
+- `002_delivery_logs.sql` present in `schema_migrations`;
+- `delivery_logs` table exists;
+- schema contains `destination_masked` and **does not contain a raw destination/phone column**.
+
+### Real Runtime Verification — 2026-10-05
+One controlled real text send was used to verify the successful audit path:
+- send HTTP `200` / success;
+- provider message ID present;
+- requestId `wa006-real-sent-001` persisted;
+- audit row `SENT` persisted with tenant/device/type/timestamp;
+- destination persisted only as masked value.
+
+One controlled invalid-destination request verified the failure audit path without sending a WhatsApp message:
+- HTTP `400` / `INVALID_PHONE`;
+- requestId `wa006-real-failed-001` persisted;
+- audit row `FAILED` persisted;
+- destination stored as `***`;
+- no provider message ID for failed request.
+
+### Log Hygiene
+- application/session sensitive-log scan: PASS;
+- no Baileys/libsignal key material detected;
+- no API token / Authorization bearer detected;
+- relevant WhatsApp destination prefix did not appear unmasked in gateway logs.
+
+### Failure Isolation
+Unit test confirms a delivery-log database INSERT failure does **not** turn a successful WhatsApp delivery response into failure. This prevents RedHub from resending solely because audit persistence failed.
 
 ### Explicit Non-Goal
 No campaign queue, scheduler, campaign retry worker, or business duplicate engine.
+
+### Acceptance Result
+**PASS / LOCKED**
+
+Correlation, masked audit data, provider result, safe failures, timestamps, persistent DB migration, and audit-failure isolation are verified.
+
+### Next
+**WA-007 — Security Gate**
 
 ---
 
@@ -538,9 +596,9 @@ Histori tidak dihapus; digantikan oleh WA-001A atas instruksi eksplisit user.
 
 ## CURRENT POSITION
 
-- **LAST PASS / LOCKED:** WA-005 — Multi-Tenant Isolation
+- **LAST PASS / LOCKED:** WA-006 — Minimal Delivery Log & Error Contract
 - **IN PROGRESS:** none
-- **NEXT:** WA-006 — Minimal Delivery Log & Error Contract
+- **NEXT:** WA-007 — Security Gate
 - **VPS DEPLOY:** NOT STARTED
 - **TARGET VPS:** `202.10.36.74`
 - **WORKFLOW:** local first -> verified -> checkpoint -> production

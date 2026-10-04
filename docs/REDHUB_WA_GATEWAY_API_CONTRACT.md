@@ -245,20 +245,27 @@ Rules:
 
 ## 8. Correlation and Delivery Logging
 
-`requestId` is a correlation ID supplied by RedHub and returned by the delivery response.
+**WA-006: PASS / LOCKED.**
 
-Persistent/minimal delivery logging is the scope of **WA-006**.
+`requestId` is the correlation ID returned by delivery endpoints:
+- RedHub-supplied requestId is preserved;
+- if omitted, gateway generates a UUID;
+- maximum length is 128 characters.
 
-WA-006 baseline fields:
+Operational audit is persisted to PostgreSQL `delivery_logs` with:
 - requestId;
 - tenantId;
 - deviceId;
-- type TEXT/DOCUMENT;
-- masked destination;
-- providerMessageId;
-- result SENT/FAILED;
+- type `TEXT` / `DOCUMENT`;
+- **masked destination only**;
+- providerMessageId on successful delivery;
+- result `SENT` / `FAILED`;
 - safe error code/message;
-- timestamp.
+- database timestamp.
+
+The audit schema does not store a raw phone/destination column.
+
+Audit persistence is failure-isolated: if the WhatsApp send succeeds but the audit INSERT fails, the delivery response remains successful and the gateway emits only a safe application error log. This avoids accidental RedHub re-send caused solely by audit failure.
 
 No campaign queue/scheduler is added by WA-006.
 
@@ -274,6 +281,7 @@ Implemented/currently expected:
 - `INVALID_PHONE`
 - `INVALID_TEXT`
 - `INVALID_REQUEST`
+- `INVALID_REQUEST_ID`
 - `INVALID_DOCUMENT_SOURCE`
 - `INVALID_DOCUMENT_FILENAME`
 - `INVALID_DOCUMENT_CAPTION`

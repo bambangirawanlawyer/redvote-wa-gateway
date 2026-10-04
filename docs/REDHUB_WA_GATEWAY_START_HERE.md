@@ -115,7 +115,8 @@ VPS lama `202.10.45.147` tidak disentuh kecuali ada instruksi eksplisit.
 - WA-003 — Text Delivery API — PASS / LOCKED
 - WA-004 — PDF / Document Delivery API — PASS / LOCKED
 - WA-005 — Multi-Tenant Isolation — PASS / LOCKED
-- WA-006 — Minimal Delivery Log & Error Contract — NEXT
+- WA-006 — Minimal Delivery Log & Error Contract — PASS / LOCKED
+- WA-007 — Security Gate — NEXT
 - Production deploy — NOT STARTED
 
 ## Mandatory Workflow
@@ -134,13 +135,12 @@ Tidak boleh mengklaim PASS tanpa verifikasi.
 
 ## Next Action
 
-Kerjakan **WA-006 — Minimal Delivery Log & Error Contract** di local:
-- correlation/request ID;
-- tenant/device/type/result;
-- destination harus masked pada log;
-- provider message ID;
-- safe error code/message;
-- timestamp;
-- jangan menambah campaign queue/scheduler.
+Kerjakan **WA-007 — Security Gate** di local:
+- bearer authentication;
+- malformed payload rejection;
+- tenant ownership/cross-tenant rejection;
+- PDF source/size/filename safeguards;
+- secret/session Git review;
+- log hygiene and no anonymous send.
 
-Jangan deploy VPS sebelum local gate WA-006 sampai WA-008 selesai.
+Jangan deploy VPS sebelum local gate WA-007 sampai WA-008 selesai.

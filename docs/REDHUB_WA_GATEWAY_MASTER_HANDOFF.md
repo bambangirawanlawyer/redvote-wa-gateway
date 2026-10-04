@@ -219,11 +219,8 @@ Real PDF document delivery, filename/caption, source guards, and cleanup verifie
 Tenant-scoped runtime registry/session paths, legacy session migration, implicit single-device default, future multi-device semantics, and cross-tenant rejection verified.
 
 ### WA-006 — Minimal Delivery Log & Error Contract
-- correlation/request ID;
-- provider message ID;
-- sent/failed result;
-- safe error;
-- no campaign queue.
+**PASS / LOCKED**
+Correlation/request ID, masked destination audit, provider ID, SENT/FAILED, safe error, timestamp, and audit failure isolation verified.
 
 ### WA-007 — Security Gate
 - bearer auth;
@@ -243,9 +240,9 @@ RedHub backend -> gateway -> WhatsApp untuk text/PDF serta reminder H-1 yang **d
 
 ## 12. Current Position
 
-**LAST PASS / LOCKED:** WA-005 — Multi-Tenant Isolation  
+**LAST PASS / LOCKED:** WA-006 — Minimal Delivery Log & Error Contract  
 **IN PROGRESS:** none  
-**NEXT:** WA-006 — Minimal Delivery Log & Error Contract  
+**NEXT:** WA-007 — Security Gate  
 **PRODUCTION:** belum  
 **TARGET VPS:** 202.10.36.74
 

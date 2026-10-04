@@ -439,3 +439,33 @@ Core configuration must not permanently default to Jember or any organization.
 `DEFAULT_TENANT_ID` and `DEFAULT_DEVICE_ID` must be provided by environment/configuration for a deployment.
 
 Jember remains only the first pilot configuration, not a core architecture assumption.
+
+## RHWA-D-048 — Minimal Delivery Audit Is Not a Queue
+WA-006 persists only operational delivery audit records.
+
+Stored fields are limited to:
+- correlation/request ID;
+- tenant/device;
+- message type;
+- masked destination;
+- provider message ID;
+- SENT/FAILED;
+- safe error code/message;
+- timestamp.
+
+The audit table is not a campaign queue, scheduler, business retry engine, or business idempotency source.
+
+## RHWA-D-049 — Never Persist Raw Destination in Delivery Audit
+The operational audit schema stores `destination_masked` only.
+
+A raw phone/destination column is intentionally absent from `delivery_logs`.
+
+Application logs must also avoid printing message destination.
+
+## RHWA-D-050 — Audit Failure Must Not Cause Duplicate Delivery
+If WhatsApp delivery succeeds but writing the audit record fails, the API delivery response remains successful.
+
+Reason:
+turning the response into failure after a successful WhatsApp send could cause RedHub to retry and duplicate the message.
+
+Audit persistence failure is logged safely without destination or credential data.
