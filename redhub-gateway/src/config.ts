@@ -43,8 +43,8 @@ export function loadConfig(): AppConfig {
     sessionDir: process.env.SESSION_DIR ?? './data/whatsapp-sessions',
     logLevel: process.env.LOG_LEVEL ?? 'info',
     serviceVersion: process.env.SERVICE_VERSION ?? '0.1.0',
-    defaultTenantId: process.env.DEFAULT_TENANT_ID ?? 'jember',
-    defaultDeviceId: process.env.DEFAULT_DEVICE_ID ?? 'jember-main',
+    defaultTenantId: required('DEFAULT_TENANT_ID'),
+    defaultDeviceId: required('DEFAULT_DEVICE_ID'),
     autoStartWhatsApp: (process.env.AUTO_START_WHATSAPP ?? 'false').toLowerCase() === 'true',
     whatsappReconnectDelayMs: Number(process.env.WHATSAPP_RECONNECT_DELAY_MS ?? '5000')
   };
