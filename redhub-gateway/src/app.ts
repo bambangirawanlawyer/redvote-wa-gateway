@@ -173,17 +173,43 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
   );
 
   app.get(
+    '/api/v1/devices',
+    { preHandler: requireInternalAuth },
+    async (request, reply) => {
+      const { tenantId } = (request.query ?? {}) as { tenantId?: string };
+      if (!tenantId) {
+        return reply.code(400).send({
+          error: {
+            code: 'TENANT_REQUIRED',
+            message: 'tenantId is required'
+          }
+        });
+      }
+      return { tenantId, devices: options.devices.list(tenantId) };
+    }
+  );
+
+  app.get(
     '/api/v1/devices/:deviceId/status',
     { preHandler: requireInternalAuth },
     async (request, reply) => {
       const { deviceId } = request.params as { deviceId: string };
-      const snapshot = options.devices.status(deviceId);
+      const { tenantId } = (request.query ?? {}) as { tenantId?: string };
+      if (!tenantId) {
+        return reply.code(400).send({
+          error: {
+            code: 'TENANT_REQUIRED',
+            message: 'tenantId is required'
+          }
+        });
+      }
+      const snapshot = options.devices.status(deviceId, tenantId);
 
       if (!snapshot) {
         return reply.code(404).send({
           error: {
             code: 'DEVICE_NOT_FOUND',
-            message: 'Device is not started'
+            message: 'Device is not started for this tenant'
           }
         });
       }
@@ -197,7 +223,16 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
     { preHandler: requireInternalAuth },
     async (request, reply) => {
       const { deviceId } = request.params as { deviceId: string };
-      const qr = options.devices.getQr(deviceId);
+      const { tenantId } = (request.query ?? {}) as { tenantId?: string };
+      if (!tenantId) {
+        return reply.code(400).send({
+          error: {
+            code: 'TENANT_REQUIRED',
+            message: 'tenantId is required'
+          }
+        });
+      }
+      const qr = options.devices.getQr(deviceId, tenantId);
 
       if (!qr) {
         return reply.code(404).send({
@@ -221,7 +256,16 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
     { preHandler: requireInternalAuth },
     async (request, reply) => {
       const { deviceId } = request.params as { deviceId: string };
-      const qr = options.devices.getQr(deviceId);
+      const { tenantId } = (request.query ?? {}) as { tenantId?: string };
+      if (!tenantId) {
+        return reply.code(400).send({
+          error: {
+            code: 'TENANT_REQUIRED',
+            message: 'tenantId is required'
+          }
+        });
+      }
+      const qr = options.devices.getQr(deviceId, tenantId);
 
       if (!qr) {
         return reply.code(404).send({
@@ -255,13 +299,13 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
         requestId?: string;
       };
 
-      if (!body.tenantId || !body.deviceId || !body.to || !body.text) {
+      if (!body.tenantId || !body.to || !body.text) {
         return reply.code(400).send({
           success: false,
           requestId: body.requestId,
           error: {
             code: 'INVALID_REQUEST',
-            message: 'tenantId, deviceId, to, and text are required'
+            message: 'tenantId, to, and text are required'
           }
         });
       }
@@ -291,7 +335,7 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
               ? 403
               : code === 'DEVICE_NOT_CONNECTED'
                 ? 409
-                : code === 'INVALID_PHONE' || code === 'INVALID_TEXT'
+                : code === 'DEVICE_REQUIRED' || code === 'INVALID_PHONE' || code === 'INVALID_TEXT'
                   ? 400
                   : 502;
 
@@ -321,22 +365,37 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
         requestId?: string;
       };
 
-      if (!body.tenantId || !body.deviceId || !body.to || !body.documentUrl || !body.filename) {
+      if (!body.tenantId || !body.to || !body.documentUrl || !body.filename) {
         return reply.code(400).send({
           success: false,
           requestId: body.requestId,
           error: {
             code: 'INVALID_REQUEST',
-            message: 'tenantId, deviceId, to, documentUrl, and filename are required'
+            message: 'tenantId, to, documentUrl, and filename are required'
           }
         });
       }
 
       try {
-        const device = options.devices.status(body.deviceId);
-        if (!device) throw new Error('DEVICE_NOT_FOUND');
-        if (device.tenantId !== body.tenantId) throw new Error('DEVICE_TENANT_MISMATCH');
-        if (device.status !== 'CONNECTED') throw new Error('DEVICE_NOT_CONNECTED');
+        if (body.deviceId) {
+          const device = options.devices.status(body.deviceId, body.tenantId);
+          if (!device) {
+            const sameDeviceOtherTenant = options.devices
+              .list()
+              .some(
+                (candidate) =>
+                  candidate.deviceId === body.deviceId && candidate.tenantId !== body.tenantId
+              );
+            if (sameDeviceOtherTenant) throw new Error('DEVICE_TENANT_MISMATCH');
+            throw new Error('DEVICE_NOT_FOUND');
+          }
+          if (device.status !== 'CONNECTED') throw new Error('DEVICE_NOT_CONNECTED');
+        } else {
+          const tenantDevices = options.devices.list(body.tenantId);
+          if (tenantDevices.length === 0) throw new Error('DEVICE_NOT_FOUND');
+          if (tenantDevices.length > 1) throw new Error('DEVICE_REQUIRED');
+          if (tenantDevices[0]?.status !== 'CONNECTED') throw new Error('DEVICE_NOT_CONNECTED');
+        }
 
         const document = await fetchPdfDocument(body.documentUrl);
         const filename = sanitizePdfFilename(body.filename);
@@ -370,7 +429,9 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
               ? 403
               : code === 'DEVICE_NOT_CONNECTED'
                 ? 409
-                : code === 'DOCUMENT_TOO_LARGE'
+                : code === 'DEVICE_REQUIRED'
+                  ? 400
+                  : code === 'DOCUMENT_TOO_LARGE'
                   ? 413
                   : code === 'INVALID_PHONE' ||
                       code === 'INVALID_DOCUMENT_SOURCE' ||

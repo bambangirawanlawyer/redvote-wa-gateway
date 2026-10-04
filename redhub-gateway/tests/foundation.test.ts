@@ -12,63 +12,99 @@ import type {
 } from '../src/whatsapp/types.js';
 
 class FakeDeviceManager implements WhatsAppDeviceManager {
-  private current?: DeviceSnapshot;
-  private qr?: string;
+  private readonly devices = new Map<string, DeviceSnapshot>();
+  private readonly qrs = new Map<string, string>();
   lastDocument?: SendDocumentInput;
 
-  connectForTest(): void {
-    this.current = {
-      deviceId: 'jember-main',
-      tenantId: 'jember',
+  private key(tenantId: string, deviceId: string): string {
+    return `${tenantId}::${deviceId}`;
+  }
+
+  connectForTest(tenantId = 'jember', deviceId = 'jember-main'): void {
+    this.devices.set(this.key(tenantId, deviceId), {
+      deviceId,
+      tenantId,
       provider: 'baileys',
       status: 'CONNECTED',
       hasQr: false
-    };
+    });
   }
 
   async start(input: StartDeviceInput): Promise<DeviceSnapshot> {
-    this.current = {
+    const snapshot: DeviceSnapshot = {
       deviceId: input.deviceId,
       tenantId: input.tenantId,
       provider: 'baileys',
       status: 'PAIRING',
       hasQr: true
     };
-    this.qr = 'fake-qr-payload';
-    return this.current;
+    const key = this.key(input.tenantId, input.deviceId);
+    this.devices.set(key, snapshot);
+    this.qrs.set(key, 'fake-qr-payload');
+    return snapshot;
   }
 
-  status(deviceId: string): DeviceSnapshot | undefined {
-    return this.current?.deviceId === deviceId ? this.current : undefined;
+  async restorePersistedSessions(): Promise<DeviceSnapshot[]> {
+    return this.list();
   }
 
-  getQr(deviceId: string): string | undefined {
-    return this.current?.deviceId === deviceId ? this.qr : undefined;
+  list(tenantId?: string): DeviceSnapshot[] {
+    return [...this.devices.values()].filter(
+      (device) => !tenantId || device.tenantId === tenantId
+    );
+  }
+
+  status(deviceId: string, tenantId?: string): DeviceSnapshot | undefined {
+    if (tenantId) return this.devices.get(this.key(tenantId, deviceId));
+    const matches = this.list().filter((device) => device.deviceId === deviceId);
+    return matches.length === 1 ? matches[0] : undefined;
+  }
+
+  getQr(deviceId: string, tenantId?: string): string | undefined {
+    if (tenantId) return this.qrs.get(this.key(tenantId, deviceId));
+    const matches = this.list().filter((device) => device.deviceId === deviceId);
+    return matches.length === 1
+      ? this.qrs.get(this.key(matches[0]!.tenantId, deviceId))
+      : undefined;
+  }
+
+  private resolveDevice(tenantId: string, deviceId?: string): DeviceSnapshot {
+    if (deviceId) {
+      const device = this.devices.get(this.key(tenantId, deviceId));
+      if (device) return device;
+      if (this.list().some((candidate) => candidate.deviceId === deviceId)) {
+        throw new Error('DEVICE_TENANT_MISMATCH');
+      }
+      throw new Error('DEVICE_NOT_FOUND');
+    }
+
+    const tenantDevices = this.list(tenantId);
+    if (tenantDevices.length === 0) throw new Error('DEVICE_NOT_FOUND');
+    if (tenantDevices.length > 1) throw new Error('DEVICE_REQUIRED');
+    return tenantDevices[0]!;
   }
 
   async sendText(input: SendTextInput): Promise<SendTextResult> {
-    if (input.deviceId !== 'jember-main') throw new Error('DEVICE_NOT_FOUND');
-    if (input.tenantId !== 'jember') throw new Error('DEVICE_TENANT_MISMATCH');
+    const device = this.resolveDevice(input.tenantId, input.deviceId);
     if (input.to === 'invalid') throw new Error('INVALID_PHONE');
     if (input.text === 'provider-fail') throw new Error('PROVIDER_ERROR');
     if (!input.text.trim()) throw new Error('INVALID_TEXT');
     return {
       tenantId: input.tenantId,
-      deviceId: input.deviceId,
+      deviceId: device.deviceId,
       to: input.to,
       providerMessageId: 'fake-provider-message-id'
     };
   }
 
   async sendDocument(input: SendDocumentInput): Promise<SendDocumentResult> {
-    if (input.deviceId !== 'jember-main') throw new Error('DEVICE_NOT_FOUND');
-    if (input.tenantId !== 'jember') throw new Error('DEVICE_TENANT_MISMATCH');
+    const device = this.resolveDevice(input.tenantId, input.deviceId);
     if (input.to === 'invalid') throw new Error('INVALID_PHONE');
     if (input.filename === 'provider-fail.pdf') throw new Error('PROVIDER_ERROR');
     this.lastDocument = input;
     return {
       tenantId: input.tenantId,
-      deviceId: input.deviceId,
+      deviceId: device.deviceId,
       to: input.to,
       providerMessageId: 'fake-document-message-id'
     };
@@ -188,7 +224,7 @@ test('pairing flow exposes protected JSON and PNG QR state', async () => {
 
     const status = await app.inject({
       method: 'GET',
-      url: '/api/v1/devices/jember-main/status',
+      url: '/api/v1/devices/jember-main/status?tenantId=jember',
       headers: { authorization: 'Bearer test-secret' }
     });
 
@@ -197,7 +233,7 @@ test('pairing flow exposes protected JSON and PNG QR state', async () => {
 
     const pairing = await app.inject({
       method: 'GET',
-      url: '/api/v1/devices/jember-main/pairing',
+      url: '/api/v1/devices/jember-main/pairing?tenantId=jember',
       headers: { authorization: 'Bearer test-secret' }
     });
 
@@ -206,7 +242,7 @@ test('pairing flow exposes protected JSON and PNG QR state', async () => {
 
     const png = await app.inject({
       method: 'GET',
-      url: '/api/v1/devices/jember-main/pairing.png',
+      url: '/api/v1/devices/jember-main/pairing.png?tenantId=jember',
       headers: { authorization: 'Bearer test-secret' }
     });
 
@@ -247,9 +283,11 @@ test('text delivery rejects missing bearer token', async () => {
 });
 
 test('text delivery returns provider message id', async () => {
+  const devices = new FakeDeviceManager();
+  devices.connectForTest();
   const app = buildApp({
     db: healthyDb(),
-    devices: new FakeDeviceManager(),
+    devices,
     apiTokenSecret: 'test-secret',
     logger: false
   });
@@ -278,9 +316,11 @@ test('text delivery returns provider message id', async () => {
 });
 
 test('text delivery rejects cross-tenant device use', async () => {
+  const devices = new FakeDeviceManager();
+  devices.connectForTest();
   const app = buildApp({
     db: healthyDb(),
-    devices: new FakeDeviceManager(),
+    devices,
     apiTokenSecret: 'test-secret',
     logger: false
   });
@@ -306,9 +346,11 @@ test('text delivery rejects cross-tenant device use', async () => {
 });
 
 test('text delivery rejects invalid destination', async () => {
+  const devices = new FakeDeviceManager();
+  devices.connectForTest();
   const app = buildApp({
     db: healthyDb(),
-    devices: new FakeDeviceManager(),
+    devices,
     apiTokenSecret: 'test-secret',
     logger: false
   });
@@ -335,9 +377,11 @@ test('text delivery rejects invalid destination', async () => {
 
 
 test('text delivery returns safe provider error', async () => {
+  const devices = new FakeDeviceManager();
+  devices.connectForTest();
   const app = buildApp({
     db: healthyDb(),
-    devices: new FakeDeviceManager(),
+    devices,
     apiTokenSecret: 'test-secret',
     logger: false
   });
@@ -639,6 +683,138 @@ test('document delivery returns safe provider error', async () => {
     assert.equal(JSON.stringify(response.json()).includes('stack'), false);
   } finally {
     globalThis.fetch = originalFetch;
+    await app.close();
+  }
+});
+
+
+test('device status and listing require tenant context', async () => {
+  const devices = new FakeDeviceManager();
+  devices.connectForTest('tenant-a', 'shared-device');
+  const app = buildApp({
+    db: healthyDb(),
+    devices,
+    apiTokenSecret: 'test-secret',
+    logger: false
+  });
+
+  try {
+    const status = await app.inject({
+      method: 'GET',
+      url: '/api/v1/devices/shared-device/status',
+      headers: { authorization: 'Bearer test-secret' }
+    });
+    assert.equal(status.statusCode, 400);
+    assert.equal(status.json().error.code, 'TENANT_REQUIRED');
+
+    const list = await app.inject({
+      method: 'GET',
+      url: '/api/v1/devices',
+      headers: { authorization: 'Bearer test-secret' }
+    });
+    assert.equal(list.statusCode, 400);
+    assert.equal(list.json().error.code, 'TENANT_REQUIRED');
+  } finally {
+    await app.close();
+  }
+});
+
+test('same device id can coexist in different tenants with isolated lookup', async () => {
+  const devices = new FakeDeviceManager();
+  devices.connectForTest('tenant-a', 'shared-device');
+  devices.connectForTest('tenant-b', 'shared-device');
+  const app = buildApp({
+    db: healthyDb(),
+    devices,
+    apiTokenSecret: 'test-secret',
+    logger: false
+  });
+
+  try {
+    const a = await app.inject({
+      method: 'GET',
+      url: '/api/v1/devices/shared-device/status?tenantId=tenant-a',
+      headers: { authorization: 'Bearer test-secret' }
+    });
+    const b = await app.inject({
+      method: 'GET',
+      url: '/api/v1/devices/shared-device/status?tenantId=tenant-b',
+      headers: { authorization: 'Bearer test-secret' }
+    });
+    const listA = await app.inject({
+      method: 'GET',
+      url: '/api/v1/devices?tenantId=tenant-a',
+      headers: { authorization: 'Bearer test-secret' }
+    });
+
+    assert.equal(a.statusCode, 200);
+    assert.equal(a.json().tenantId, 'tenant-a');
+    assert.equal(b.statusCode, 200);
+    assert.equal(b.json().tenantId, 'tenant-b');
+    assert.equal(listA.statusCode, 200);
+    assert.equal(listA.json().devices.length, 1);
+    assert.equal(listA.json().devices[0].tenantId, 'tenant-a');
+  } finally {
+    await app.close();
+  }
+});
+
+test('single-device tenant is implicit default for text delivery', async () => {
+  const devices = new FakeDeviceManager();
+  devices.connectForTest('tenant-a', 'main');
+  const app = buildApp({
+    db: healthyDb(),
+    devices,
+    apiTokenSecret: 'test-secret',
+    logger: false
+  });
+
+  try {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/v1/messages/text',
+      headers: { authorization: 'Bearer test-secret' },
+      payload: {
+        tenantId: 'tenant-a',
+        to: '628123456789',
+        text: 'Implicit default test'
+      }
+    });
+
+    assert.equal(response.statusCode, 200);
+    assert.equal(response.json().success, true);
+    assert.equal(response.json().deviceId, 'main');
+  } finally {
+    await app.close();
+  }
+});
+
+test('multi-device tenant requires explicit deviceId', async () => {
+  const devices = new FakeDeviceManager();
+  devices.connectForTest('tenant-a', 'main');
+  devices.connectForTest('tenant-a', 'secondary');
+  const app = buildApp({
+    db: healthyDb(),
+    devices,
+    apiTokenSecret: 'test-secret',
+    logger: false
+  });
+
+  try {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/v1/messages/text',
+      headers: { authorization: 'Bearer test-secret' },
+      payload: {
+        tenantId: 'tenant-a',
+        to: '628123456789',
+        text: 'Must choose device'
+      }
+    });
+
+    assert.equal(response.statusCode, 400);
+    assert.equal(response.json().error.code, 'DEVICE_REQUIRED');
+  } finally {
     await app.close();
   }
 });

@@ -1,4 +1,5 @@
-import { mkdir } from 'node:fs/promises';
+import type { Dirent } from 'node:fs';
+import { access, mkdir, readdir, rename } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { Boom } from '@hapi/boom';
 import pino from 'pino';
@@ -34,6 +35,8 @@ type RuntimeDevice = {
 export type BaileysDeviceManagerOptions = {
   sessionDir: string;
   reconnectDelayMs?: number;
+  legacyTenantId?: string;
+  legacyDeviceId?: string;
 };
 
 const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
@@ -42,27 +45,37 @@ export class BaileysDeviceManager implements WhatsAppDeviceManager {
   private readonly devices = new Map<string, RuntimeDevice>();
   private readonly sessionDir: string;
   private readonly reconnectDelayMs: number;
+  private readonly legacyTenantId?: string;
+  private readonly legacyDeviceId?: string;
   private shuttingDown = false;
 
   constructor(options: BaileysDeviceManagerOptions) {
     this.sessionDir = resolve(options.sessionDir);
     this.reconnectDelayMs = options.reconnectDelayMs ?? 5000;
+    this.legacyTenantId = options.legacyTenantId;
+    this.legacyDeviceId = options.legacyDeviceId;
   }
 
-  status(deviceId: string): DeviceSnapshot | undefined {
-    const runtime = this.devices.get(deviceId);
+  list(tenantId?: string): DeviceSnapshot[] {
+    return [...this.devices.values()]
+      .filter((runtime) => !tenantId || runtime.tenantId === tenantId)
+      .map((runtime) => this.snapshot(runtime));
+  }
+
+  status(deviceId: string, tenantId?: string): DeviceSnapshot | undefined {
+    const runtime = this.findRuntime(deviceId, tenantId);
     return runtime ? this.snapshot(runtime) : undefined;
   }
 
-  getQr(deviceId: string): string | undefined {
-    return this.devices.get(deviceId)?.qr;
+  getQr(deviceId: string, tenantId?: string): string | undefined {
+    return this.findRuntime(deviceId, tenantId)?.qr;
   }
 
   async sendText(input: SendTextInput): Promise<SendTextResult> {
-    this.validateId(input.deviceId, 'deviceId');
     this.validateId(input.tenantId, 'tenantId');
+    if (input.deviceId) this.validateId(input.deviceId, 'deviceId');
 
-    const runtime = this.requireConnectedDevice(input.deviceId, input.tenantId);
+    const runtime = this.resolveConnectedDevice(input.tenantId, input.deviceId);
     const to = this.normalizeDestination(input.to);
     const text = input.text.trim();
     if (!text || text.length > 4096) throw new Error('INVALID_TEXT');
@@ -81,10 +94,10 @@ export class BaileysDeviceManager implements WhatsAppDeviceManager {
   }
 
   async sendDocument(input: SendDocumentInput): Promise<SendDocumentResult> {
-    this.validateId(input.deviceId, 'deviceId');
     this.validateId(input.tenantId, 'tenantId');
+    if (input.deviceId) this.validateId(input.deviceId, 'deviceId');
 
-    const runtime = this.requireConnectedDevice(input.deviceId, input.tenantId);
+    const runtime = this.resolveConnectedDevice(input.tenantId, input.deviceId);
     const to = this.normalizeDestination(input.to);
 
     try {
@@ -109,7 +122,8 @@ export class BaileysDeviceManager implements WhatsAppDeviceManager {
     this.validateId(input.deviceId, 'deviceId');
     this.validateId(input.tenantId, 'tenantId');
 
-    const existing = this.devices.get(input.deviceId);
+    const key = this.deviceKey(input.tenantId, input.deviceId);
+    const existing = this.devices.get(key);
     if (
       existing &&
       (existing.status === 'CONNECTING' ||
@@ -134,9 +148,42 @@ export class BaileysDeviceManager implements WhatsAppDeviceManager {
       throw new Error('DEVICE_TENANT_MISMATCH');
     }
 
-    this.devices.set(input.deviceId, runtime);
+    this.devices.set(key, runtime);
     await this.connect(runtime);
     return this.snapshot(runtime);
+  }
+
+  async restorePersistedSessions(): Promise<DeviceSnapshot[]> {
+    await this.migrateLegacySessionIfNeeded();
+
+    let tenantEntries: Dirent[];
+    try {
+      tenantEntries = await readdir(this.sessionDir, { withFileTypes: true });
+    } catch {
+      return [];
+    }
+
+    const restored: DeviceSnapshot[] = [];
+    for (const tenantEntry of tenantEntries) {
+      if (!tenantEntry.isDirectory() || !SAFE_ID.test(tenantEntry.name)) continue;
+
+      const tenantDir = resolve(this.sessionDir, tenantEntry.name);
+      const deviceEntries = await readdir(tenantDir, { withFileTypes: true });
+      for (const deviceEntry of deviceEntries) {
+        if (!deviceEntry.isDirectory() || !SAFE_ID.test(deviceEntry.name)) continue;
+        const credsPath = resolve(tenantDir, deviceEntry.name, 'creds.json');
+        if (!(await this.pathExists(credsPath))) continue;
+
+        restored.push(
+          await this.start({
+            tenantId: tenantEntry.name,
+            deviceId: deviceEntry.name
+          })
+        );
+      }
+    }
+
+    return restored;
   }
 
   async shutdown(): Promise<void> {
@@ -161,7 +208,7 @@ export class BaileysDeviceManager implements WhatsAppDeviceManager {
     runtime.lastErrorCode = undefined;
 
     try {
-      const authDir = resolve(this.sessionDir, runtime.deviceId);
+      const authDir = resolve(this.sessionDir, runtime.tenantId, runtime.deviceId);
       await mkdir(authDir, { recursive: true, mode: 0o700 });
 
       const { state, saveCreds } = await useMultiFileAuthState(authDir);
@@ -249,14 +296,71 @@ export class BaileysDeviceManager implements WhatsAppDeviceManager {
     };
   }
 
-  private requireConnectedDevice(deviceId: string, tenantId: string): RuntimeDevice {
-    const runtime = this.devices.get(deviceId);
-    if (!runtime) throw new Error('DEVICE_NOT_FOUND');
-    if (runtime.tenantId !== tenantId) throw new Error('DEVICE_TENANT_MISMATCH');
+  private resolveConnectedDevice(tenantId: string, deviceId?: string): RuntimeDevice {
+    let runtime: RuntimeDevice | undefined;
+
+    if (deviceId) {
+      runtime = this.devices.get(this.deviceKey(tenantId, deviceId));
+      if (!runtime) {
+        const sameDeviceOtherTenant = [...this.devices.values()].some(
+          (candidate) => candidate.deviceId === deviceId && candidate.tenantId !== tenantId
+        );
+        if (sameDeviceOtherTenant) throw new Error('DEVICE_TENANT_MISMATCH');
+        throw new Error('DEVICE_NOT_FOUND');
+      }
+    } else {
+      const candidates = [...this.devices.values()].filter(
+        (candidate) => candidate.tenantId === tenantId
+      );
+      if (candidates.length === 0) throw new Error('DEVICE_NOT_FOUND');
+      if (candidates.length > 1) throw new Error('DEVICE_REQUIRED');
+      runtime = candidates[0]!;
+    }
+
     if (runtime.status !== 'CONNECTED' || !runtime.socket) {
       throw new Error('DEVICE_NOT_CONNECTED');
     }
     return runtime;
+  }
+
+  private findRuntime(deviceId: string, tenantId?: string): RuntimeDevice | undefined {
+    if (tenantId) return this.devices.get(this.deviceKey(tenantId, deviceId));
+
+    const matches = [...this.devices.values()].filter(
+      (runtime) => runtime.deviceId === deviceId
+    );
+    return matches.length === 1 ? matches[0] : undefined;
+  }
+
+  private deviceKey(tenantId: string, deviceId: string): string {
+    return `${tenantId}::${deviceId}`;
+  }
+
+  private async migrateLegacySessionIfNeeded(): Promise<void> {
+    if (!this.legacyTenantId || !this.legacyDeviceId) return;
+    this.validateId(this.legacyTenantId, 'tenantId');
+    this.validateId(this.legacyDeviceId, 'deviceId');
+
+    const legacyDir = resolve(this.sessionDir, this.legacyDeviceId);
+    const legacyCreds = resolve(legacyDir, 'creds.json');
+    if (!(await this.pathExists(legacyCreds))) return;
+
+    const tenantDir = resolve(this.sessionDir, this.legacyTenantId);
+    const targetDir = resolve(tenantDir, this.legacyDeviceId);
+    const targetCreds = resolve(targetDir, 'creds.json');
+    if (await this.pathExists(targetCreds)) return;
+
+    await mkdir(tenantDir, { recursive: true, mode: 0o700 });
+    await rename(legacyDir, targetDir);
+  }
+
+  private async pathExists(path: string): Promise<boolean> {
+    try {
+      await access(path);
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   private validateId(value: string, field: string): void {

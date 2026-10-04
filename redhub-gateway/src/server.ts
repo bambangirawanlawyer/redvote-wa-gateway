@@ -36,8 +36,12 @@ await runMigrations(pool);
 
 const devices = new BaileysDeviceManager({
   sessionDir: config.sessionDir,
-  reconnectDelayMs: config.whatsappReconnectDelayMs
+  reconnectDelayMs: config.whatsappReconnectDelayMs,
+  legacyTenantId: config.defaultTenantId,
+  legacyDeviceId: config.defaultDeviceId
 });
+
+await devices.restorePersistedSessions();
 
 const app = buildApp({
   db: pool,

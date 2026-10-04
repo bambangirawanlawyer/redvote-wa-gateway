@@ -23,7 +23,7 @@ export type StartDeviceInput = {
 
 export type SendTextInput = {
   tenantId: string;
-  deviceId: string;
+  deviceId?: string;
   to: string;
   text: string;
 };
@@ -37,7 +37,7 @@ export type SendTextResult = {
 
 export type SendDocumentInput = {
   tenantId: string;
-  deviceId: string;
+  deviceId?: string;
   to: string;
   document: Buffer;
   filename: string;
@@ -53,8 +53,10 @@ export type SendDocumentResult = {
 
 export interface WhatsAppDeviceManager {
   start(input: StartDeviceInput): Promise<DeviceSnapshot>;
-  status(deviceId: string): DeviceSnapshot | undefined;
-  getQr(deviceId: string): string | undefined;
+  restorePersistedSessions(): Promise<DeviceSnapshot[]>;
+  list(tenantId?: string): DeviceSnapshot[];
+  status(deviceId: string, tenantId?: string): DeviceSnapshot | undefined;
+  getQr(deviceId: string, tenantId?: string): string | undefined;
   sendText(input: SendTextInput): Promise<SendTextResult>;
   sendDocument(input: SendDocumentInput): Promise<SendDocumentResult>;
   shutdown(): Promise<void>;
