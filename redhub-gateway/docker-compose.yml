@@ -4,7 +4,7 @@ services:
     environment:
       POSTGRES_DB: redhub_wa
       POSTGRES_USER: redhub_wa_app
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-redhub_local_dev_only}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U redhub_wa_app -d redhub_wa"]
       interval: 5s
@@ -22,13 +22,14 @@ services:
       NODE_ENV: ${NODE_ENV:-development}
       HOST: 0.0.0.0
       PORT: 3410
-      DATABASE_URL: postgresql://redhub_wa_app:${POSTGRES_PASSWORD:-redhub_local_dev_only}@db:5432/redhub_wa
-      API_TOKEN_SECRET: ${API_TOKEN_SECRET:-local-dev-only-change-me}
+      DATABASE_URL: postgresql://redhub_wa_app:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@db:5432/redhub_wa
+      API_TOKEN_SECRET: ${API_TOKEN_SECRET:?API_TOKEN_SECRET is required}
+      DOCUMENT_ALLOWED_HOSTS: ${DOCUMENT_ALLOWED_HOSTS:-}
       SESSION_DIR: /app/data/whatsapp-sessions
       LOG_LEVEL: ${LOG_LEVEL:-info}
       SERVICE_VERSION: ${SERVICE_VERSION:-0.1.0}
-      DEFAULT_TENANT_ID: ${DEFAULT_TENANT_ID:-jember}
-      DEFAULT_DEVICE_ID: ${DEFAULT_DEVICE_ID:-jember-main}
+      DEFAULT_TENANT_ID: ${DEFAULT_TENANT_ID:?DEFAULT_TENANT_ID is required}
+      DEFAULT_DEVICE_ID: ${DEFAULT_DEVICE_ID:?DEFAULT_DEVICE_ID is required}
       AUTO_START_WHATSAPP: ${AUTO_START_WHATSAPP:-false}
       WHATSAPP_RECONNECT_DELAY_MS: ${WHATSAPP_RECONNECT_DELAY_MS:-5000}
     depends_on:
