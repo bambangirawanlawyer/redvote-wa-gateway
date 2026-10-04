@@ -1,4 +1,5 @@
 import { timingSafeEqual } from 'node:crypto';
+import { basename } from 'node:path';
 import Fastify, {
   type FastifyInstance,
   type FastifyReply,
@@ -18,6 +19,70 @@ export type BuildAppOptions = {
   logger?: boolean | Record<string, unknown>;
   serviceVersion?: string;
 };
+
+const MAX_PDF_BYTES = 10 * 1024 * 1024;
+
+function sanitizePdfFilename(value: string): string {
+  const safe = basename(value.trim()).replace(/[^A-Za-z0-9._ -]/g, '_').slice(0, 120);
+  if (!safe || safe === '.' || safe === '..') throw new Error('INVALID_DOCUMENT_FILENAME');
+  return safe.toLowerCase().endsWith('.pdf') ? safe : `${safe}.pdf`;
+}
+
+async function fetchPdfDocument(documentUrl: string): Promise<Buffer> {
+  let url: URL;
+  try {
+    url = new URL(documentUrl);
+  } catch {
+    throw new Error('INVALID_DOCUMENT_SOURCE');
+  }
+
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+    throw new Error('INVALID_DOCUMENT_SOURCE');
+  }
+
+  let response: Response;
+  try {
+    response = await fetch(url, { redirect: 'follow' });
+  } catch {
+    throw new Error('INVALID_DOCUMENT_SOURCE');
+  }
+
+  if (!response.ok) throw new Error('INVALID_DOCUMENT_SOURCE');
+
+  const contentLength = Number(response.headers.get('content-length') ?? '0');
+  if (Number.isFinite(contentLength) && contentLength > MAX_PDF_BYTES) {
+    throw new Error('DOCUMENT_TOO_LARGE');
+  }
+
+  const contentType = (response.headers.get('content-type') ?? '').toLowerCase();
+  if (!contentType.includes('application/pdf')) {
+    throw new Error('UNSUPPORTED_DOCUMENT_TYPE');
+  }
+
+  if (!response.body) throw new Error('INVALID_DOCUMENT_SOURCE');
+
+  const reader = response.body.getReader();
+  const chunks: Buffer[] = [];
+  let totalBytes = 0;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    totalBytes += value.byteLength;
+    if (totalBytes > MAX_PDF_BYTES) {
+      await reader.cancel();
+      throw new Error('DOCUMENT_TOO_LARGE');
+    }
+    chunks.push(Buffer.from(value));
+  }
+
+  if (totalBytes === 0) throw new Error('INVALID_DOCUMENT_SOURCE');
+  const bytes = Buffer.concat(chunks, totalBytes);
+  if (bytes.subarray(0, 5).toString('ascii') !== '%PDF-') {
+    throw new Error('UNSUPPORTED_DOCUMENT_TYPE');
+  }
+  return bytes;
+}
 
 function secureBearerMatches(header: string | undefined, secret: string): boolean {
   if (!header?.startsWith('Bearer ')) return false;
@@ -236,6 +301,91 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
           error: {
             code,
             message: 'Unable to send WhatsApp text message'
+          }
+        });
+      }
+    }
+  );
+
+  app.post(
+    '/api/v1/messages/document',
+    { preHandler: requireInternalAuth },
+    async (request, reply) => {
+      const body = (request.body ?? {}) as {
+        tenantId?: string;
+        deviceId?: string;
+        to?: string;
+        documentUrl?: string;
+        filename?: string;
+        caption?: string;
+        requestId?: string;
+      };
+
+      if (!body.tenantId || !body.deviceId || !body.to || !body.documentUrl || !body.filename) {
+        return reply.code(400).send({
+          success: false,
+          requestId: body.requestId,
+          error: {
+            code: 'INVALID_REQUEST',
+            message: 'tenantId, deviceId, to, documentUrl, and filename are required'
+          }
+        });
+      }
+
+      try {
+        const device = options.devices.status(body.deviceId);
+        if (!device) throw new Error('DEVICE_NOT_FOUND');
+        if (device.tenantId !== body.tenantId) throw new Error('DEVICE_TENANT_MISMATCH');
+        if (device.status !== 'CONNECTED') throw new Error('DEVICE_NOT_CONNECTED');
+
+        const document = await fetchPdfDocument(body.documentUrl);
+        const filename = sanitizePdfFilename(body.filename);
+        const caption = body.caption?.trim();
+        if (caption && caption.length > 1024) throw new Error('INVALID_DOCUMENT_CAPTION');
+
+        const result = await options.devices.sendDocument({
+          tenantId: body.tenantId,
+          deviceId: body.deviceId,
+          to: body.to,
+          document,
+          filename,
+          caption: caption || undefined
+        });
+
+        return reply.code(200).send({
+          success: true,
+          tenantId: result.tenantId,
+          deviceId: result.deviceId,
+          to: result.to,
+          filename,
+          providerMessageId: result.providerMessageId,
+          requestId: body.requestId
+        });
+      } catch (error) {
+        const code = error instanceof Error ? error.message : 'PROVIDER_ERROR';
+        const statusCode =
+          code === 'DEVICE_NOT_FOUND'
+            ? 404
+            : code === 'DEVICE_TENANT_MISMATCH'
+              ? 403
+              : code === 'DEVICE_NOT_CONNECTED'
+                ? 409
+                : code === 'DOCUMENT_TOO_LARGE'
+                  ? 413
+                  : code === 'INVALID_PHONE' ||
+                      code === 'INVALID_DOCUMENT_SOURCE' ||
+                      code === 'INVALID_DOCUMENT_FILENAME' ||
+                      code === 'INVALID_DOCUMENT_CAPTION' ||
+                      code === 'UNSUPPORTED_DOCUMENT_TYPE'
+                    ? 400
+                    : 502;
+
+        return reply.code(statusCode).send({
+          success: false,
+          requestId: body.requestId,
+          error: {
+            code,
+            message: 'Unable to send WhatsApp PDF document'
           }
         });
       }

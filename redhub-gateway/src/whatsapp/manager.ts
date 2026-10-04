@@ -11,6 +11,8 @@ import makeWASocket, {
 import type {
   DeviceConnectionStatus,
   DeviceSnapshot,
+  SendDocumentInput,
+  SendDocumentResult,
   SendTextInput,
   SendTextResult,
   StartDeviceInput,
@@ -60,21 +62,38 @@ export class BaileysDeviceManager implements WhatsAppDeviceManager {
     this.validateId(input.deviceId, 'deviceId');
     this.validateId(input.tenantId, 'tenantId');
 
-    const runtime = this.devices.get(input.deviceId);
-    if (!runtime) throw new Error('DEVICE_NOT_FOUND');
-    if (runtime.tenantId !== input.tenantId) {
-      throw new Error('DEVICE_TENANT_MISMATCH');
-    }
-    if (runtime.status !== 'CONNECTED' || !runtime.socket) {
-      throw new Error('DEVICE_NOT_CONNECTED');
-    }
-
+    const runtime = this.requireConnectedDevice(input.deviceId, input.tenantId);
     const to = this.normalizeDestination(input.to);
     const text = input.text.trim();
     if (!text || text.length > 4096) throw new Error('INVALID_TEXT');
 
     try {
-      const result = await runtime.socket.sendMessage(`${to}@s.whatsapp.net`, { text });
+      const result = await runtime.socket!.sendMessage(`${to}@s.whatsapp.net`, { text });
+      return {
+        tenantId: runtime.tenantId,
+        deviceId: runtime.deviceId,
+        to,
+        providerMessageId: result?.key.id ?? undefined
+      };
+    } catch {
+      throw new Error('PROVIDER_ERROR');
+    }
+  }
+
+  async sendDocument(input: SendDocumentInput): Promise<SendDocumentResult> {
+    this.validateId(input.deviceId, 'deviceId');
+    this.validateId(input.tenantId, 'tenantId');
+
+    const runtime = this.requireConnectedDevice(input.deviceId, input.tenantId);
+    const to = this.normalizeDestination(input.to);
+
+    try {
+      const result = await runtime.socket!.sendMessage(`${to}@s.whatsapp.net`, {
+        document: input.document,
+        mimetype: 'application/pdf',
+        fileName: input.filename,
+        caption: input.caption
+      });
       return {
         tenantId: runtime.tenantId,
         deviceId: runtime.deviceId,
@@ -228,6 +247,16 @@ export class BaileysDeviceManager implements WhatsAppDeviceManager {
       lastConnectedAt: runtime.lastConnectedAt,
       lastErrorCode: runtime.lastErrorCode
     };
+  }
+
+  private requireConnectedDevice(deviceId: string, tenantId: string): RuntimeDevice {
+    const runtime = this.devices.get(deviceId);
+    if (!runtime) throw new Error('DEVICE_NOT_FOUND');
+    if (runtime.tenantId !== tenantId) throw new Error('DEVICE_TENANT_MISMATCH');
+    if (runtime.status !== 'CONNECTED' || !runtime.socket) {
+      throw new Error('DEVICE_NOT_CONNECTED');
+    }
+    return runtime;
   }
 
   private validateId(value: string, field: string): void {

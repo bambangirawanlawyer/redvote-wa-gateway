@@ -35,10 +35,27 @@ export type SendTextResult = {
   providerMessageId?: string;
 };
 
+export type SendDocumentInput = {
+  tenantId: string;
+  deviceId: string;
+  to: string;
+  document: Buffer;
+  filename: string;
+  caption?: string;
+};
+
+export type SendDocumentResult = {
+  tenantId: string;
+  deviceId: string;
+  to: string;
+  providerMessageId?: string;
+};
+
 export interface WhatsAppDeviceManager {
   start(input: StartDeviceInput): Promise<DeviceSnapshot>;
   status(deviceId: string): DeviceSnapshot | undefined;
   getQr(deviceId: string): string | undefined;
   sendText(input: SendTextInput): Promise<SendTextResult>;
+  sendDocument(input: SendDocumentInput): Promise<SendDocumentResult>;
   shutdown(): Promise<void>;
 }

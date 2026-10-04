@@ -3,6 +3,8 @@ import test from 'node:test';
 import { buildApp, type HealthDatabase } from '../src/app.js';
 import type {
   DeviceSnapshot,
+  SendDocumentInput,
+  SendDocumentResult,
   SendTextInput,
   SendTextResult,
   StartDeviceInput,
@@ -12,6 +14,17 @@ import type {
 class FakeDeviceManager implements WhatsAppDeviceManager {
   private current?: DeviceSnapshot;
   private qr?: string;
+  lastDocument?: SendDocumentInput;
+
+  connectForTest(): void {
+    this.current = {
+      deviceId: 'jember-main',
+      tenantId: 'jember',
+      provider: 'baileys',
+      status: 'CONNECTED',
+      hasQr: false
+    };
+  }
 
   async start(input: StartDeviceInput): Promise<DeviceSnapshot> {
     this.current = {
@@ -44,6 +57,20 @@ class FakeDeviceManager implements WhatsAppDeviceManager {
       deviceId: input.deviceId,
       to: input.to,
       providerMessageId: 'fake-provider-message-id'
+    };
+  }
+
+  async sendDocument(input: SendDocumentInput): Promise<SendDocumentResult> {
+    if (input.deviceId !== 'jember-main') throw new Error('DEVICE_NOT_FOUND');
+    if (input.tenantId !== 'jember') throw new Error('DEVICE_TENANT_MISMATCH');
+    if (input.to === 'invalid') throw new Error('INVALID_PHONE');
+    if (input.filename === 'provider-fail.pdf') throw new Error('PROVIDER_ERROR');
+    this.lastDocument = input;
+    return {
+      tenantId: input.tenantId,
+      deviceId: input.deviceId,
+      to: input.to,
+      providerMessageId: 'fake-document-message-id'
     };
   }
 
@@ -336,6 +363,282 @@ test('text delivery returns safe provider error', async () => {
     assert.equal(JSON.stringify(response.json()).includes('test-secret'), false);
     assert.equal(JSON.stringify(response.json()).includes('stack'), false);
   } finally {
+    await app.close();
+  }
+});
+
+
+test('document delivery rejects missing bearer token', async () => {
+  const app = buildApp({
+    db: healthyDb(),
+    devices: new FakeDeviceManager(),
+    apiTokenSecret: 'test-secret',
+    logger: false
+  });
+
+  try {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/v1/messages/document',
+      payload: {
+        tenantId: 'jember',
+        deviceId: 'jember-main',
+        to: '628123456789',
+        documentUrl: 'https://example.test/undangan.pdf',
+        filename: 'undangan.pdf'
+      }
+    });
+
+    assert.equal(response.statusCode, 401);
+    assert.equal(response.json().error.code, 'UNAUTHORIZED');
+  } finally {
+    await app.close();
+  }
+});
+
+test('document delivery fetches PDF in memory and sends filename/caption', async () => {
+  const devices = new FakeDeviceManager();
+  devices.connectForTest();
+  const app = buildApp({
+    db: healthyDb(),
+    devices,
+    apiTokenSecret: 'test-secret',
+    logger: false
+  });
+  const originalFetch = globalThis.fetch;
+  const pdf = Buffer.from('%PDF-1.4\n1 0 obj\n<<>>\nendobj\n%%EOF\n');
+
+  globalThis.fetch = (async () =>
+    new Response(pdf, {
+      status: 200,
+      headers: {
+        'content-type': 'application/pdf',
+        'content-length': String(pdf.length)
+      }
+    })) as typeof fetch;
+
+  try {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/v1/messages/document',
+      headers: { authorization: 'Bearer test-secret' },
+      payload: {
+        tenantId: 'jember',
+        deviceId: 'jember-main',
+        to: '628123456789',
+        documentUrl: 'https://example.test/undangan.pdf',
+        filename: '../Undangan: Rapat',
+        caption: 'Undangan resmi WA-004',
+        requestId: 'req-wa004-test'
+      }
+    });
+
+    assert.equal(response.statusCode, 200);
+    assert.equal(response.json().success, true);
+    assert.equal(response.json().providerMessageId, 'fake-document-message-id');
+    assert.equal(response.json().filename, 'Undangan_ Rapat.pdf');
+    assert.equal(response.json().requestId, 'req-wa004-test');
+    assert.equal(devices.lastDocument?.filename, 'Undangan_ Rapat.pdf');
+    assert.equal(devices.lastDocument?.caption, 'Undangan resmi WA-004');
+    assert.equal(devices.lastDocument?.document.subarray(0, 5).toString('ascii'), '%PDF-');
+  } finally {
+    globalThis.fetch = originalFetch;
+    await app.close();
+  }
+});
+
+test('document delivery rejects invalid source protocol', async () => {
+  const devices = new FakeDeviceManager();
+  devices.connectForTest();
+  const app = buildApp({
+    db: healthyDb(),
+    devices,
+    apiTokenSecret: 'test-secret',
+    logger: false
+  });
+
+  try {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/v1/messages/document',
+      headers: { authorization: 'Bearer test-secret' },
+      payload: {
+        tenantId: 'jember',
+        deviceId: 'jember-main',
+        to: '628123456789',
+        documentUrl: 'file:///tmp/undangan.pdf',
+        filename: 'undangan.pdf'
+      }
+    });
+
+    assert.equal(response.statusCode, 400);
+    assert.equal(response.json().error.code, 'INVALID_DOCUMENT_SOURCE');
+  } finally {
+    await app.close();
+  }
+});
+
+test('document delivery rejects non-PDF content type', async () => {
+  const devices = new FakeDeviceManager();
+  devices.connectForTest();
+  const app = buildApp({
+    db: healthyDb(),
+    devices,
+    apiTokenSecret: 'test-secret',
+    logger: false
+  });
+  const originalFetch = globalThis.fetch;
+
+  globalThis.fetch = (async () =>
+    new Response('not a pdf', {
+      status: 200,
+      headers: { 'content-type': 'text/plain' }
+    })) as typeof fetch;
+
+  try {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/v1/messages/document',
+      headers: { authorization: 'Bearer test-secret' },
+      payload: {
+        tenantId: 'jember',
+        deviceId: 'jember-main',
+        to: '628123456789',
+        documentUrl: 'https://example.test/not-pdf',
+        filename: 'undangan.pdf'
+      }
+    });
+
+    assert.equal(response.statusCode, 400);
+    assert.equal(response.json().error.code, 'UNSUPPORTED_DOCUMENT_TYPE');
+  } finally {
+    globalThis.fetch = originalFetch;
+    await app.close();
+  }
+});
+
+test('document delivery rejects oversized PDF before reading body', async () => {
+  const devices = new FakeDeviceManager();
+  devices.connectForTest();
+  const app = buildApp({
+    db: healthyDb(),
+    devices,
+    apiTokenSecret: 'test-secret',
+    logger: false
+  });
+  const originalFetch = globalThis.fetch;
+
+  globalThis.fetch = (async () =>
+    new Response(Buffer.from('%PDF-1.4'), {
+      status: 200,
+      headers: {
+        'content-type': 'application/pdf',
+        'content-length': String(10 * 1024 * 1024 + 1)
+      }
+    })) as typeof fetch;
+
+  try {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/v1/messages/document',
+      headers: { authorization: 'Bearer test-secret' },
+      payload: {
+        tenantId: 'jember',
+        deviceId: 'jember-main',
+        to: '628123456789',
+        documentUrl: 'https://example.test/large.pdf',
+        filename: 'large.pdf'
+      }
+    });
+
+    assert.equal(response.statusCode, 413);
+    assert.equal(response.json().error.code, 'DOCUMENT_TOO_LARGE');
+  } finally {
+    globalThis.fetch = originalFetch;
+    await app.close();
+  }
+});
+
+test('document delivery rejects cross-tenant access before fetching PDF', async () => {
+  const devices = new FakeDeviceManager();
+  devices.connectForTest();
+  const app = buildApp({
+    db: healthyDb(),
+    devices,
+    apiTokenSecret: 'test-secret',
+    logger: false
+  });
+  const originalFetch = globalThis.fetch;
+  let fetchCalled = false;
+
+  globalThis.fetch = (async () => {
+    fetchCalled = true;
+    throw new Error('fetch must not run');
+  }) as typeof fetch;
+
+  try {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/v1/messages/document',
+      headers: { authorization: 'Bearer test-secret' },
+      payload: {
+        tenantId: 'tenant-lain',
+        deviceId: 'jember-main',
+        to: '628123456789',
+        documentUrl: 'https://example.test/undangan.pdf',
+        filename: 'undangan.pdf'
+      }
+    });
+
+    assert.equal(response.statusCode, 403);
+    assert.equal(response.json().error.code, 'DEVICE_TENANT_MISMATCH');
+    assert.equal(fetchCalled, false);
+  } finally {
+    globalThis.fetch = originalFetch;
+    await app.close();
+  }
+});
+
+test('document delivery returns safe provider error', async () => {
+  const devices = new FakeDeviceManager();
+  devices.connectForTest();
+  const app = buildApp({
+    db: healthyDb(),
+    devices,
+    apiTokenSecret: 'test-secret',
+    logger: false
+  });
+  const originalFetch = globalThis.fetch;
+  const pdf = Buffer.from('%PDF-1.4\n%%EOF\n');
+
+  globalThis.fetch = (async () =>
+    new Response(pdf, {
+      status: 200,
+      headers: { 'content-type': 'application/pdf' }
+    })) as typeof fetch;
+
+  try {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/v1/messages/document',
+      headers: { authorization: 'Bearer test-secret' },
+      payload: {
+        tenantId: 'jember',
+        deviceId: 'jember-main',
+        to: '628123456789',
+        documentUrl: 'https://example.test/provider-fail.pdf',
+        filename: 'provider-fail.pdf',
+        requestId: 'req-wa004-provider-fail'
+      }
+    });
+
+    assert.equal(response.statusCode, 502);
+    assert.equal(response.json().error.code, 'PROVIDER_ERROR');
+    assert.equal(response.json().requestId, 'req-wa004-provider-fail');
+    assert.equal(JSON.stringify(response.json()).includes('test-secret'), false);
+    assert.equal(JSON.stringify(response.json()).includes('stack'), false);
+  } finally {
+    globalThis.fetch = originalFetch;
     await app.close();
   }
 });
