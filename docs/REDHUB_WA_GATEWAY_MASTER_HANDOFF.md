@@ -232,16 +232,25 @@ Correlation/request ID, masked destination audit, provider ID, SENT/FAILED, safe
 **PASS / LOCKED**
 Bearer auth, payload validation, tenant ownership, document SSRF protection, PDF limits, filename sanitation, strong runtime secrets, session permissions, non-root execution, loopback exposure, Git secret/session review, and log hygiene verified.
 
-### WA-008 — Local RedHub Contract Validation
-**DEFERRED / EXTERNAL DEPENDENCY — actual RedHub backend source/runtime unavailable**
+### WA-008 — Actual RedHub Backend Integration Validation
+**PASS / LOCKED — 2026-10-05**
 
-Gateway-side contract harness and integration guide are ready:
-- `docs/REDHUB_BACKEND_INTEGRATION.md`;
-- `redhub-gateway/scripts/redhub-contract-smoke.mjs`.
+The previous backend-access blocker is resolved.
 
-Non-sending smoke against the real local gateway passes health, tenant mapping, auth, text error contract, document error contract, and requestId handling.
-
-WA-008 may only be locked after the actual RedHub backend is accessible and verified to call text/PDF delivery while keeping broadcast/reminder H-1 orchestration in RedHub.
+Verified:
+- actual production backend runtime identified as `redhub-hybrid.service`;
+- recovered private source repository: `bambangirawanlawyer/redhub-backend`;
+- backend integration branch: `feat/redhub-wa-gateway-provider`;
+- RedHub business logic remains in the backend; gateway remains delivery-only;
+- Jember mapping: `jember` / `jember-main`;
+- backend adapter -> gateway connection: PASS / CONNECTED;
+- backend -> gateway TEXT: SENT;
+- backend -> gateway PDF: SENT;
+- authenticated `broadcastMeetingInvitation` TEST business flow -> gateway -> WhatsApp: PASS;
+- Firestore and gateway delivery audit both recorded the gateway delivery as SENT;
+- user visually confirmed the business-flow invitation/PDF arrived;
+- Fonnte credential remains available as rollback;
+- production remains in TEST mode until WA-010.
 
 ### WA-009 - VPS Deployment
 **PASS / LOCKED - 2026-10-05**
@@ -274,10 +283,14 @@ RedHub backend -> gateway -> WhatsApp untuk text/PDF serta reminder H-1 yang **d
 
 ## 12. Current Position
 
-**LAST PASS / LOCKED:** WA-009 - Production Deployment
-**DEFERRED:** WA-008 — Local RedHub Contract Validation (actual RedHub backend unavailable)
-**WA-010:** blocked until WA-008 actual RedHub integration is completed
-**PRODUCTION:** WA-009 PASS / LOCKED; standalone gateway healthy on VPS
+**WA-008:** PASS / LOCKED — actual RedHub backend recovered and integrated
+**WA-009:** PASS / LOCKED — production gateway deployment
+**NEXT / PR:** WA-010 — Production End-to-End / Go-Live Gate
+**PRODUCTION PROVIDER:** REDHUB_GATEWAY
+**BROADCAST MODE:** TEST — do not switch to LIVE before WA-010 PASS / LOCKED
+**TENANT / DEVICE:** jember / jember-main
+**ROLLBACK:** Fonnte credential retained
+**PRODUCTION:** backend, reminder timer, gateway, PostgreSQL healthy; WhatsApp CONNECTED
 **TARGET VPS:** 202.10.36.74
 
 ## 13. Handoff Rule
@@ -286,8 +299,9 @@ Saat chat baru:
 1. baca START HERE;
 2. baca Master Handoff;
 3. baca Checkpoints;
-4. baca Decisions;
-5. baca API Contract;
-6. cek branch/HEAD;
-7. lanjut dari checkpoint IN PROGRESS/NEXT;
-8. jangan mengulang PASS/LOCKED tanpa regression.
+4. baca `docs/NEXT_SESSION_PR.md`;
+5. baca Decisions;
+6. baca API Contract;
+7. cek branch/HEAD;
+8. lanjut langsung dari WA-010 / checkpoint NEXT;
+9. jangan mengulang PASS/LOCKED tanpa regression.

@@ -592,8 +592,8 @@ Bearer auth, payload validation, tenant ownership, PDF/document limits, SSRF pro
 
 ---
 
-## WA-008 — Local RedHub Contract Validation
-**Status: DEFERRED / EXTERNAL DEPENDENCY**
+## WA-008 — Actual RedHub Backend Integration Validation
+**Status: PASS / LOCKED**
 **Date:** 2026-10-05
 **Branch:** `feat/redhub-wa-008-redhub-contract`
 **Gateway contract harness commit:** `5468595bf3270f95585ce5fb3bde1e4540e7d29e`
@@ -624,36 +624,31 @@ Non-sending contract smoke against the real local gateway:
 - document error contract + requestId preservation: PASS;
 - WhatsApp messages sent by harness: **0**.
 
-### Blocker
-The actual RedHub backend source/runtime is not available in the current environment.
+### Actual Backend Recovery and Integration — PASS
+The previous external dependency is resolved.
 
-Verified:
-- `D:\Projects` contains the gateway repo but no RedHub application/backend checkout;
-- connected GitHub account returns no installed RedHub repository;
-- public repository search for RedHub under the current owner returns no repository.
+Verified actual backend:
+- production runtime: `redhub-hybrid.service` on VPS `202.10.36.74`;
+- recovered private source repository: `bambangirawanlawyer/redhub-backend`;
+- backend integration branch: `feat/redhub-wa-gateway-provider`;
+- RedHub retains broadcast, recipient selection, TEST/LIVE mode, invitation templates, H-1 scheduling, business logs, and retry/business decisions;
+- delivery adapter `REDHUB_GATEWAY` calls the gateway text/PDF APIs;
+- Jember mapping: organization/tenant `jember`, device `jember-main`;
+- backend adapter connection test: PASS / device `CONNECTED`;
+- backend -> gateway TEXT delivery: SENT;
+- backend -> gateway DOCUMENT/PDF delivery: SENT;
+- authenticated `broadcastMeetingInvitation` business-flow UAT: HTTP 200 / `SENT` / sent 1 / failed 0;
+- Firestore recorded `lastTestBroadcastProvider=REDHUB_GATEWAY` and `lastTestBroadcastStatus=SENT`;
+- user visually confirmed the RB-002 invitation/PDF arrived in WhatsApp;
+- gateway delivery audit persisted the business-flow delivery as `SENT`;
+- backend and gateway sensitive-log scans: PASS;
+- Fonnte credential remains available for rollback;
+- production remains in `TEST` mode until WA-010 go-live gate.
 
-Therefore the following acceptance items cannot yet be truthfully verified:
-- actual RedHub backend code calls text delivery;
-- actual RedHub backend code calls PDF delivery;
-- actual backend consumes gateway success/error;
-- actual backend tenant mapping is wired;
-- H-1 reminder remains triggered by RedHub backend in the real implementation.
+### Acceptance Result
+**PASS / LOCKED**
 
-### Exit Condition
-WA-008 may move to PASS / LOCKED only after the RedHub backend source/runtime becomes accessible and the real integration is verified.
-
-Required handoff to unblock:
-- local backend path **or** GitHub repository access;
-- identify the existing broadcast/reminder delivery service;
-- configure gateway base URL/token/tenant/device;
-- wire text/PDF delivery client;
-- run actual backend -> gateway integration tests;
-- verify broadcast/reminder ownership remains in RedHub.
-
-### Deployment Decision — 2026-10-05
-User explicitly chose to continue standalone gateway deployment even though the RedHub backend repository is unavailable.
-
-WA-008 remains **not PASS** and is deferred as an external dependency. It does **not** block WA-009 standalone gateway deployment. WA-010 production end-to-end with RedHub remains blocked until WA-008 is completed.
+WA-008 is no longer blocked or deferred. The actual RedHub backend source/runtime is recovered, versioned in GitHub, and verified against the production WA Gateway.
 
 ---
 
@@ -788,9 +783,12 @@ Histori tidak dihapus; digantikan oleh WA-001A atas instruksi eksplisit user.
 
 ## CURRENT POSITION
 
-- **LAST PASS / LOCKED:** WA-009 — Production Deployment
-- **DEFERRED:** WA-008 — Local RedHub Contract Validation (actual RedHub backend unavailable)
-- **WA-010:** blocked until WA-008 actual RedHub integration is completed
-- **VPS DEPLOY:** PASS / LOCKED
+- **WA-008:** PASS / LOCKED — actual RedHub backend recovered and integrated with production gateway
+- **WA-009:** PASS / LOCKED — production gateway deployment
+- **NEXT / PR:** WA-010 — Production End-to-End / Go-Live Gate
+- **PRODUCTION PROVIDER:** `REDHUB_GATEWAY`
+- **BROADCAST MODE:** `TEST` — do not switch to LIVE before WA-010 exit gates pass
+- **TENANT / DEVICE:** `jember` / `jember-main`
+- **ROLLBACK:** Fonnte credential retained
 - **TARGET VPS:** `202.10.36.74`
 - **WORKFLOW:** local first -> verified -> checkpoint -> production
