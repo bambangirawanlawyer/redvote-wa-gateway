@@ -37,6 +37,7 @@ class FakeDeviceManager implements WhatsAppDeviceManager {
     if (input.deviceId !== 'jember-main') throw new Error('DEVICE_NOT_FOUND');
     if (input.tenantId !== 'jember') throw new Error('DEVICE_TENANT_MISMATCH');
     if (input.to === 'invalid') throw new Error('INVALID_PHONE');
+    if (input.text === 'provider-fail') throw new Error('PROVIDER_ERROR');
     if (!input.text.trim()) throw new Error('INVALID_TEXT');
     return {
       tenantId: input.tenantId,
@@ -300,6 +301,40 @@ test('text delivery rejects invalid destination', async () => {
 
     assert.equal(response.statusCode, 400);
     assert.equal(response.json().error.code, 'INVALID_PHONE');
+  } finally {
+    await app.close();
+  }
+});
+
+
+test('text delivery returns safe provider error', async () => {
+  const app = buildApp({
+    db: healthyDb(),
+    devices: new FakeDeviceManager(),
+    apiTokenSecret: 'test-secret',
+    logger: false
+  });
+
+  try {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/v1/messages/text',
+      headers: { authorization: 'Bearer test-secret' },
+      payload: {
+        tenantId: 'jember',
+        deviceId: 'jember-main',
+        to: '628123456789',
+        text: 'provider-fail',
+        requestId: 'req-provider-fail'
+      }
+    });
+
+    assert.equal(response.statusCode, 502);
+    assert.equal(response.json().success, false);
+    assert.equal(response.json().error.code, 'PROVIDER_ERROR');
+    assert.equal(response.json().requestId, 'req-provider-fail');
+    assert.equal(JSON.stringify(response.json()).includes('test-secret'), false);
+    assert.equal(JSON.stringify(response.json()).includes('stack'), false);
   } finally {
     await app.close();
   }
