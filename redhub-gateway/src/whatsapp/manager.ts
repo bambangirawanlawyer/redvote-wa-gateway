@@ -1,6 +1,7 @@
 import { mkdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { Boom } from '@hapi/boom';
+import pino from 'pino';
 import makeWASocket, {
   Browsers,
   DisconnectReason,
@@ -116,6 +117,7 @@ export class BaileysDeviceManager implements WhatsAppDeviceManager {
 
       const socket = makeWASocket({
         auth: state,
+        logger: pino({ level: 'silent' }),
         browser: Browsers.ubuntu('RedHub WA Gateway'),
         printQRInTerminal: false,
         syncFullHistory: false,
