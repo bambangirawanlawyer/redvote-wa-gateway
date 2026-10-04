@@ -27,6 +27,10 @@ services:
       SESSION_DIR: /app/data/whatsapp-sessions
       LOG_LEVEL: ${LOG_LEVEL:-info}
       SERVICE_VERSION: ${SERVICE_VERSION:-0.1.0}
+      DEFAULT_TENANT_ID: ${DEFAULT_TENANT_ID:-jember}
+      DEFAULT_DEVICE_ID: ${DEFAULT_DEVICE_ID:-jember-main}
+      AUTO_START_WHATSAPP: ${AUTO_START_WHATSAPP:-false}
+      WHATSAPP_RECONNECT_DELAY_MS: ${WHATSAPP_RECONNECT_DELAY_MS:-5000}
     depends_on:
       db:
         condition: service_healthy
