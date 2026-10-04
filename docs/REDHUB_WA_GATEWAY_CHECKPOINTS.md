@@ -212,22 +212,64 @@ Local only. VPS deployment has not started.
 ---
 
 ## WA-003 — Text Delivery API
-**Status: PENDING**
+**Status: IN PROGRESS**  
+**Date:** 2026-10-05  
+**Branch:** `feat/redhub-wa-003-text-delivery`  
+**Implementation commit:** `5a816fd`  
+**Provider-error test commit:** `cdd0abc`
 
-### Required
+### Implemented
 - `POST /api/v1/messages/text`;
-- tenant/device resolve;
-- phone normalization/validation;
-- send text;
-- return provider message ID/status/error;
-- no campaign logic.
+- authenticated internal API only;
+- tenant/device ownership validation;
+- destination normalization and validation;
+- Indonesian local `0...` normalization to `62...` baseline;
+- connected-device guard;
+- text length validation;
+- Baileys text delivery;
+- provider message ID returned;
+- request correlation ID passthrough;
+- safe error mapping;
+- no campaign/broadcast/reminder logic in gateway.
 
-### Acceptance
-- one real text received;
-- invalid phone rejected;
-- wrong tenant/device rejected;
-- safe provider error;
-- no secret leakage.
+### Automated Verification
+Local Node verification:
+- typecheck: PASS;
+- unit tests: **9/9 PASS**;
+- build: PASS.
+
+Docker build verification:
+- Docker image build: PASS;
+- embedded typecheck/test/build: PASS;
+- existing persistent session survived recreate;
+- device returned directly to `CONNECTED` without new QR.
+
+### Real API Verification
+- invalid destination -> HTTP `400` / `INVALID_PHONE`: PASS;
+- cross-tenant device use -> HTTP `403` / `DEVICE_TENANT_MISMATCH`: PASS;
+- real text send -> HTTP `200`: PASS;
+- response `success=true`: PASS;
+- provider message ID present: PASS;
+- request ID preserved: PASS.
+
+Two controlled real sends were accepted by WhatsApp using the paired Jember test device.
+
+### Log Hygiene Fix
+Real send exposed hard-coded `libsignal` console output containing session ratchet material. Before checkpoint lock:
+- source identified in `libsignal/src/session_record.js`;
+- exact sensitive session-object console patterns are suppressed without disabling normal application logs;
+- post-fix real send succeeded;
+- post-send scan found no `remoteIdentityKey`, `rootKey`, `privKey`, `SessionEntry`, API token, or Authorization bearer material.
+
+**Sensitive log scan: PASS**
+
+### Remaining Acceptance Gate
+- confirm at least one real test text is visibly received in WhatsApp: **WAITING USER CONFIRMATION**.
+
+WA-003 MUST NOT be marked PASS / LOCKED until visible receipt is confirmed.
+
+### Next After PASS
+**WA-004 — PDF / Document Delivery API**
 
 ---
 
@@ -386,8 +428,8 @@ Histori tidak dihapus; digantikan oleh WA-001A atas instruksi eksplisit user.
 ## CURRENT POSITION
 
 - **LAST PASS / LOCKED:** WA-002 — WhatsApp Device & Persistent Session
-- **IN PROGRESS:** none
-- **NEXT:** WA-003 — Text Delivery API
+- **IN PROGRESS:** WA-003 — Text Delivery API (waiting visible receipt confirmation)
+- **NEXT AFTER PASS:** WA-004 — PDF / Document Delivery API
 - **VPS DEPLOY:** NOT STARTED
 - **TARGET VPS:** `202.10.36.74`
 - **WORKFLOW:** local first -> verified -> checkpoint -> production
