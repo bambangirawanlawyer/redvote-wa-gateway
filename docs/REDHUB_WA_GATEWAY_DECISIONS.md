@@ -509,3 +509,17 @@ Gateway logger configuration redacts `req.headers.authorization`.
 The existing Baileys/libsignal sensitive-session logging suppression remains mandatory.
 
 Local security verification must include a marker-based log scan before WA-007 can be locked.
+
+
+## RHWA-D-055 — WA-008 Requires the Actual RedHub Backend
+A gateway-side mock, smoke script, or synthetic client is useful for contract preparation but is **not sufficient** to mark WA-008 PASS / LOCKED.
+
+WA-008 exit requires access to the actual RedHub backend source/runtime and verification that:
+- the backend calls text delivery;
+- the backend calls PDF/document delivery;
+- tenant/device mapping is wired correctly;
+- gateway success/error is consumed by backend logic;
+- broadcast orchestration remains in RedHub;
+- reminder H-1 remains triggered by RedHub.
+
+Until that source/runtime is accessible, WA-008 is BLOCKED and WA-009 production deployment must not start.

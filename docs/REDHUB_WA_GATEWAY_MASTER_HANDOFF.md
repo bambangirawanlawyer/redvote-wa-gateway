@@ -233,7 +233,15 @@ Correlation/request ID, masked destination audit, provider ID, SENT/FAILED, safe
 Bearer auth, payload validation, tenant ownership, document SSRF protection, PDF limits, filename sanitation, strong runtime secrets, session permissions, non-root execution, loopback exposure, Git secret/session review, and log hygiene verified.
 
 ### WA-008 — Local RedHub Contract Validation
-Backend RedHub memanggil gateway dengan payload text/PDF tanpa memindahkan broadcast/reminder logic.
+**BLOCKED — actual RedHub backend source/runtime unavailable**
+
+Gateway-side contract harness and integration guide are ready:
+- `docs/REDHUB_BACKEND_INTEGRATION.md`;
+- `redhub-gateway/scripts/redhub-contract-smoke.mjs`.
+
+Non-sending smoke against the real local gateway passes health, tenant mapping, auth, text error contract, document error contract, and requestId handling.
+
+WA-008 may only be locked after the actual RedHub backend is accessible and verified to call text/PDF delivery while keeping broadcast/reminder H-1 orchestration in RedHub.
 
 ### WA-009 — VPS Deployment
 Deploy ke `202.10.36.74`, persistent volume, firewall/private networking, restart test, backup baseline.
@@ -244,8 +252,8 @@ RedHub backend -> gateway -> WhatsApp untuk text/PDF serta reminder H-1 yang **d
 ## 12. Current Position
 
 **LAST PASS / LOCKED:** WA-007 — Security Gate  
-**IN PROGRESS:** none  
-**NEXT:** WA-008 — Local RedHub Contract Validation  
+**BLOCKED:** WA-008 — Local RedHub Contract Validation (actual RedHub backend unavailable)  
+**NEXT AFTER UNBLOCK:** WA-009 — Production Deployment  
 **PRODUCTION:** belum  
 **TARGET VPS:** 202.10.36.74
 

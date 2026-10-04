@@ -593,17 +593,65 @@ Bearer auth, payload validation, tenant ownership, PDF/document limits, SSRF pro
 ---
 
 ## WA-008 — Local RedHub Contract Validation
-**Status: PENDING**
+**Status: BLOCKED**  
+**Date:** 2026-10-05  
+**Branch:** `feat/redhub-wa-008-redhub-contract`  
+**Gateway contract harness commit:** `5468595bf3270f95585ce5fb3bde1e4540e7d29e`
 
 ### Goal
-Validate that backend RedHub can call gateway without moving broadcast/reminder logic into gateway.
+Validate that the **actual RedHub backend** can call gateway without moving broadcast/reminder logic into gateway.
 
-### Acceptance
-- backend can send text request;
-- backend can send PDF request;
-- tenant mapping works;
-- gateway result/error can be consumed;
-- reminder H-1 remains triggered by backend RedHub.
+### Gateway-Side Preparation — PASS
+Delivered:
+- `docs/REDHUB_BACKEND_INTEGRATION.md`;
+- `redhub-gateway/scripts/redhub-contract-smoke.mjs`;
+- npm script entry for contract smoke;
+- exact text/document payload and response contract documented;
+- backend retry ownership documented;
+- H-1 and broadcast responsibility boundary documented.
+
+Regression gate after harness addition:
+- typecheck: PASS;
+- unit tests: **30/30 PASS**;
+- build: PASS.
+
+Non-sending contract smoke against the real local gateway:
+- health: PASS;
+- tenant/device mapping: PASS;
+- device CONNECTED contract: PASS;
+- unauthorized contract: PASS;
+- text error contract + requestId preservation: PASS;
+- document error contract + requestId preservation: PASS;
+- WhatsApp messages sent by harness: **0**.
+
+### Blocker
+The actual RedHub backend source/runtime is not available in the current environment.
+
+Verified:
+- `D:\Projects` contains the gateway repo but no RedHub application/backend checkout;
+- connected GitHub account returns no installed RedHub repository;
+- public repository search for RedHub under the current owner returns no repository.
+
+Therefore the following acceptance items cannot yet be truthfully verified:
+- actual RedHub backend code calls text delivery;
+- actual RedHub backend code calls PDF delivery;
+- actual backend consumes gateway success/error;
+- actual backend tenant mapping is wired;
+- H-1 reminder remains triggered by RedHub backend in the real implementation.
+
+### Exit Condition
+WA-008 may move to PASS / LOCKED only after the RedHub backend source/runtime becomes accessible and the real integration is verified.
+
+Required handoff to unblock:
+- local backend path **or** GitHub repository access;
+- identify the existing broadcast/reminder delivery service;
+- configure gateway base URL/token/tenant/device;
+- wire text/PDF delivery client;
+- run actual backend -> gateway integration tests;
+- verify broadcast/reminder ownership remains in RedHub.
+
+### Safety
+Do **not** start WA-009 production deployment while WA-008 remains BLOCKED.
 
 ---
 
@@ -668,8 +716,8 @@ Histori tidak dihapus; digantikan oleh WA-001A atas instruksi eksplisit user.
 ## CURRENT POSITION
 
 - **LAST PASS / LOCKED:** WA-007 — Security Gate
-- **IN PROGRESS:** none
-- **NEXT:** WA-008 — Local RedHub Contract Validation
+- **BLOCKED:** WA-008 — Local RedHub Contract Validation (actual RedHub backend unavailable)
+- **NEXT AFTER UNBLOCK:** WA-009 — Production Deployment
 - **VPS DEPLOY:** NOT STARTED
 - **TARGET VPS:** `202.10.36.74`
 - **WORKFLOW:** local first -> verified -> checkpoint -> production

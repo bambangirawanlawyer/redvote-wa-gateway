@@ -117,7 +117,7 @@ VPS lama `202.10.45.147` tidak disentuh kecuali ada instruksi eksplisit.
 - WA-005 — Multi-Tenant Isolation — PASS / LOCKED
 - WA-006 — Minimal Delivery Log & Error Contract — PASS / LOCKED
 - WA-007 — Security Gate — PASS / LOCKED
-- WA-008 — Local RedHub Contract Validation — NEXT
+- WA-008 — Local RedHub Contract Validation — BLOCKED (actual RedHub backend unavailable)
 - Production deploy — NOT STARTED
 
 ## Mandatory Workflow
@@ -136,11 +136,12 @@ Tidak boleh mengklaim PASS tanpa verifikasi.
 
 ## Next Action
 
-Kerjakan **WA-008 — Local RedHub Contract Validation**:
-- backend RedHub memanggil text delivery contract;
-- backend RedHub memanggil PDF/document delivery contract;
-- tenant mapping tervalidasi;
-- gateway result/error bisa dikonsumsi backend;
-- broadcast/reminder H-1 tetap milik backend RedHub.
+**WA-008 saat ini BLOCKED** karena source/runtime backend RedHub asli tidak tersedia pada komputer atau koneksi GitHub akun ini.
+
+Gateway-side contract harness sudah PASS dan terdokumentasi di:
+- `docs/REDHUB_BACKEND_INTEGRATION.md`;
+- `redhub-gateway/scripts/redhub-contract-smoke.mjs`.
+
+Untuk unblock, sediakan local path atau akses repository backend RedHub, lalu verifikasi hookup text/PDF dan ownership reminder H-1.
 
 Jangan deploy VPS sebelum WA-008 PASS / LOCKED.
