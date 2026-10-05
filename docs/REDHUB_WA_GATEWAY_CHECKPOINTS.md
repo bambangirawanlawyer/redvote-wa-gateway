@@ -753,19 +753,61 @@ VPS lama `202.10.45.147` tidak disentuh.
 ---
 
 ## WA-010 — Production End-to-End
-**Status: PENDING**
+**Status: PASS / LOCKED**
+**Date:** 2026-10-05
+**Branch:** `feat/redhub-wa-009-vps-deploy`
 
-### Validate
-- RedHub backend -> gateway -> WhatsApp text;
-- RedHub backend -> gateway -> WhatsApp PDF;
-- multi-tenant routing;
-- H-1 reminder initiated by RedHub backend;
-- provider response/error handling;
-- restart recovery;
-- no cross-tenant session use.
+### H-1 Reminder End-to-End
+- dedicated UAT meeting: `wa010-reminder-e2e-20261005`;
+- reminder mode remained `TEST`;
+- RedHub reminder worker was triggered exactly once;
+- `redhub-reminders.service` result: `success`;
+- Firestore recorded `reminderStatus=SENT`;
+- Firestore recorded `reminderProvider=REDHUB_GATEWAY`;
+- gateway delivery audit recorded the matching `TEXT / SENT` delivery;
+- routing resolved to `jember / jember-main`.
 
-### Exit Gate
-WA Gateway V1 COMPLETE hanya setelah WA-010 PASS / LOCKED.
+### Routing / Error Safety
+- normal Jember tenant/device connection: `CONNECTED`;
+- cross-tenant lookup through the RedHub gateway adapter returned `DEVICE_NOT_FOUND`;
+- no cross-tenant session was used;
+- existing gateway validation/error contract from WA-005/WA-007 remains intact.
+
+### Restart / Persistence
+- gateway container restart completed successfully;
+- health returned `status=ok` / database `ok`;
+- WhatsApp briefly entered `CONNECTING` during restart recovery;
+- it returned to `CONNECTED` automatically without re-pairing;
+- backend service and reminder timer remained active.
+
+### Rollback Gate
+- Fonnte rollback credential remains stored;
+- Fonnte was not deleted during go-live;
+- rollback remains available if the RedHub Gateway must be disabled.
+
+### Controlled Go-Live
+- Jember broadcast mode changed from `TEST` to `LIVE` only after the previous gates passed;
+- selected production provider remained `REDHUB_GATEWAY`;
+- first controlled LIVE send targeted only the configured test recipient;
+- LIVE validation send result: `SENT 1 / FAILED 0`;
+- gateway delivery audit recorded the LIVE `TEXT / SENT` result;
+- tenant/device in audit: `jember / jember-main`;
+- scheduled reminders that existed before go-live remain explicitly stored as `TEST` (4 scheduled reminders), preventing accidental retroactive LIVE delivery.
+
+### Final Production State
+- provider: `REDHUB_GATEWAY`;
+- broadcast mode: `LIVE`;
+- tenant/device: `jember / jember-main`;
+- WhatsApp: `CONNECTED`;
+- backend: active;
+- reminder timer: active;
+- gateway/PostgreSQL: healthy;
+- Fonnte credential: retained for rollback.
+
+### Acceptance Result
+**PASS / LOCKED**
+
+WA Gateway V1 is complete and ready for normal RedHub LIVE use. Future changes must use a new checkpoint and must not silently alter the locked delivery-layer responsibility boundary.
 
 ---
 
@@ -785,10 +827,13 @@ Histori tidak dihapus; digantikan oleh WA-001A atas instruksi eksplisit user.
 
 - **WA-008:** PASS / LOCKED — actual RedHub backend recovered and integrated with production gateway
 - **WA-009:** PASS / LOCKED — production gateway deployment
-- **NEXT / PR:** WA-010 — Production End-to-End / Go-Live Gate
+- **WA-010:** PASS / LOCKED — production end-to-end and controlled go-live complete
+- **WA GATEWAY V1:** COMPLETE / LIVE
 - **PRODUCTION PROVIDER:** `REDHUB_GATEWAY`
-- **BROADCAST MODE:** `TEST` — do not switch to LIVE before WA-010 exit gates pass
+- **BROADCAST MODE:** `LIVE`
 - **TENANT / DEVICE:** `jember` / `jember-main`
+- **WHATSAPP:** `CONNECTED`
 - **ROLLBACK:** Fonnte credential retained
 - **TARGET VPS:** `202.10.36.74`
+- **NEXT:** normal operation; future capabilities or architecture changes require a new checkpoint
 - **WORKFLOW:** local first -> verified -> checkpoint -> production

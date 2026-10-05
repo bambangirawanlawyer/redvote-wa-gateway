@@ -117,9 +117,10 @@ VPS lama `202.10.45.147` tidak disentuh kecuali ada instruksi eksplisit.
 - WA-005 — Multi-Tenant Isolation — PASS / LOCKED
 - WA-006 — Minimal Delivery Log & Error Contract — PASS / LOCKED
 - WA-007 — Security Gate — PASS / LOCKED
-- WA-008 — Local RedHub Contract Validation — DEFERRED / EXTERNAL DEPENDENCY
-- WA-009 — Production Deployment — IN PROGRESS
-- WA-010 — Production End-to-End — blocked until WA-008 is completed
+- WA-008 — Actual RedHub Backend Integration Validation — PASS / LOCKED
+- WA-009 — Production Deployment — PASS / LOCKED
+- WA-010 — Production End-to-End / Go-Live — PASS / LOCKED
+- WA Gateway V1 — COMPLETE / LIVE
 
 ## Mandatory Workflow
 
@@ -137,12 +138,18 @@ Tidak boleh mengklaim PASS tanpa verifikasi.
 
 ## Next Action
 
-**WA-008 tetap DEFERRED / EXTERNAL DEPENDENCY** karena backend RedHub asli belum tersedia. Gateway-side contract harness sudah PASS tetapi tidak menggantikan actual backend integration.
+Tidak ada mandatory V1 checkpoint yang tersisa.
 
-**Current action: WA-009 — Production Deployment** ke VPS `202.10.36.74` sebagai standalone delivery gateway. User explicitly approved continuing deployment while WA-008 remains deferred.
+Production saat ini:
+- provider `REDHUB_GATEWAY`;
+- mode `LIVE`;
+- tenant/device `jember / jember-main`;
+- WhatsApp `CONNECTED`;
+- backend, reminder timer, gateway dan PostgreSQL healthy;
+- Fonnte credential tetap disimpan sebagai rollback.
 
 Rules:
-- jangan menyentuh VPS lama `202.10.45.147`;
-- jangan mengklaim WA-008 PASS;
-- jangan mengklaim WA-010 PASS sebelum actual RedHub backend integration selesai;
-- setiap deployment gate yang lulus wajib dicatat sebagai checkpoint evidence.
+- jangan menyentuh VPS lama `202.10.45.147` tanpa instruksi eksplisit;
+- jangan mengulang WA-000 sampai WA-010 tanpa regression terverifikasi;
+- jangan memindahkan scheduler/broadcast/reminder business logic ke gateway;
+- future work wajib dibuat sebagai checkpoint/decision baru.

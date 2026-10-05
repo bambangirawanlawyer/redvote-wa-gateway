@@ -279,15 +279,29 @@ Final production acceptance:
 - deployment evidence commit: `37d1356`.
 
 ### WA-010 - Production End-to-End
-RedHub backend -> gateway -> WhatsApp untuk text/PDF serta reminder H-1 yang **dipicu oleh RedHub backend**.
+**PASS / LOCKED — 2026-10-05**
+
+Production end-to-end gate completed:
+- H-1 reminder was triggered by the RedHub backend reminder worker and delivered through the gateway;
+- Firestore recorded the UAT reminder as `SENT` using `REDHUB_GATEWAY`;
+- gateway audit recorded the matching `TEXT / SENT` result for `jember / jember-main`;
+- cross-tenant adapter lookup safely returned `DEVICE_NOT_FOUND`;
+- gateway restart recovered from `CONNECTING` to `CONNECTED` automatically without re-pairing;
+- Fonnte credential remains available as rollback;
+- Jember was switched from `TEST` to `LIVE` only after all previous gates passed;
+- first controlled LIVE send returned `sent=1 / failed=0` and was recorded as `TEXT / SENT`;
+- pre-existing scheduled reminders remain explicitly stored as `TEST`.
+
+WA Gateway V1 is complete and operational in LIVE mode.
 
 ## 12. Current Position
 
 **WA-008:** PASS / LOCKED — actual RedHub backend recovered and integrated
 **WA-009:** PASS / LOCKED — production gateway deployment
-**NEXT / PR:** WA-010 — Production End-to-End / Go-Live Gate
+**WA-010:** PASS / LOCKED — production end-to-end and controlled go-live
+**WA GATEWAY V1:** COMPLETE / LIVE
 **PRODUCTION PROVIDER:** REDHUB_GATEWAY
-**BROADCAST MODE:** TEST — do not switch to LIVE before WA-010 PASS / LOCKED
+**BROADCAST MODE:** LIVE
 **TENANT / DEVICE:** jember / jember-main
 **ROLLBACK:** Fonnte credential retained
 **PRODUCTION:** backend, reminder timer, gateway, PostgreSQL healthy; WhatsApp CONNECTED
@@ -303,5 +317,6 @@ Saat chat baru:
 5. baca Decisions;
 6. baca API Contract;
 7. cek branch/HEAD;
-8. lanjut langsung dari WA-010 / checkpoint NEXT;
-9. jangan mengulang PASS/LOCKED tanpa regression.
+8. anggap WA-000 sampai WA-010 PASS / LOCKED dan production LIVE kecuali ada regression terverifikasi;
+9. future work harus dibuat sebagai checkpoint/decision baru;
+10. jangan mengulang PASS/LOCKED tanpa regression.
