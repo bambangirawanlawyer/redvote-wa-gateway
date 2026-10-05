@@ -828,11 +828,14 @@ Histori tidak dihapus; digantikan oleh WA-001A atas instruksi eksplisit user.
 - **WA-008:** PASS / LOCKED — actual RedHub backend recovered and integrated with production gateway
 - **WA-009:** PASS / LOCKED — production gateway deployment
 - **WA-010:** PASS / LOCKED — production end-to-end and controlled go-live complete
+- **WA-011:** PASS / LOCKED — RedHub multi-device management, QR pairing and sender selection complete
 - **WA GATEWAY V1:** COMPLETE / LIVE
 - **PRODUCTION PROVIDER:** `REDHUB_GATEWAY`
-- **BROADCAST MODE:** `LIVE`
-- **TENANT / DEVICE:** `jember` / `jember-main`
-- **WHATSAPP:** `CONNECTED`
+- **BROADCAST MODE:** `TEST` (current organization setting; WA-010 historical go-live remains locked)
+- **TENANT:** `jember`
+- **DEVICES:** `jember-main` + `jember-02`
+- **DEFAULT DEVICE:** not selected yet; operator-controlled
+- **WHATSAPP:** both devices `CONNECTED`
 - **ROLLBACK:** Fonnte credential retained
 - **TARGET VPS:** `202.10.36.74`
 - **NEXT:** normal operation; future capabilities or architecture changes require a new checkpoint
@@ -843,7 +846,7 @@ Histori tidak dihapus; digantikan oleh WA-001A atas instruksi eksplisit user.
 
 ## WA-011 — RedHub Device Management & Pairing Integration
 
-**Status: IN PROGRESS**
+**Status: PASS / LOCKED**
 **Date:** 2026-10-05
 **Branch:** `feat/redhub-wa-011-device-management`
 
@@ -896,24 +899,30 @@ Production smoke:
 - management endpoint remains authenticated (anonymous request -> 401);
 - existing gateway/session remained healthy.
 
-### Remaining Exit Gates
+### Production Acceptance
 
-- implement Flutter RedHub device-management UI;
-- render pairing QR from backend response;
-- poll status until CONNECTED;
-- expose default-device action;
-- expose sender selector in Undangan & Broadcast;
-- pair one additional controlled WhatsApp number;
-- send controlled message/PDF through the additional device;
-- verify meeting reminder keeps the selected/default device;
-- responsive frontend verification;
-- GitHub checkpoint and production deployment.
+- authoritative Flutter source recovered and verified against the active production build;
+- UI-018 device-management frontend implemented and deployed;
+- device list/status rendering: PASS;
+- QR pairing from RedHub: PASS;
+- pairing resume / `Tampilkan QR`: PASS;
+- default-device action exposed in RedHub: PASS;
+- broadcast sender selector implemented for CONNECTED devices: PASS;
+- second controlled device `jember-02` paired successfully;
+- `jember-main` = CONNECTED (`6285702459733`);
+- `jember-02` = CONNECTED (`6285806700300`);
+- controlled TEXT send through `jember-02`: `sent=1`, `failed=0`;
+- gateway delivery audit records `jember-02` TEXT and DOCUMENT deliveries as SENT;
+- Flutter analyze: PASS / no issues;
+- focused WhatsApp UI regression: PASS;
+- active frontend release after QR resume hotfix: `/var/www/redhub.redvote.id/releases/20261006-010820`;
+- active backend release: `/opt/redhub-hybrid/releases/20261006-003054`;
+- backend, reminder timer, gateway and PostgreSQL remain healthy;
+- gateway token remains server-side only;
+- default sender is intentionally operator-selectable and was not forced automatically.
 
-### Current Blocker
+### Acceptance Result
 
-The RedHub Flutter source repository is not available in the currently connected
-GitHub account and was not found in the local project directories. Do not edit
-the compiled production `main.dart.js` as a substitute for the source repo.
+**PASS / LOCKED**
 
-WA-011 remains **IN PROGRESS** until the Flutter source is available and the UI
-plus controlled multi-device E2E gate passes.
+WA-011 is complete. Multi-device management, pairing and sender selection are now available from RedHub without terminal/VPS access while the gateway remains a delivery-only layer.

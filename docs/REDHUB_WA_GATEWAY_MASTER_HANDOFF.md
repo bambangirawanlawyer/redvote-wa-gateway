@@ -295,41 +295,45 @@ Production end-to-end gate completed:
 WA Gateway V1 is complete and operational in LIVE mode.
 
 ### WA-011 - RedHub Device Management & Pairing Integration
-**IN PROGRESS — 2026-10-05**
+**PASS / LOCKED — 2026-10-06**
 
-Goal: manage multiple WhatsApp sender devices directly from RedHub without
-terminal/VPS access.
+RedHub can now manage multiple WhatsApp sender devices without terminal/VPS access.
 
-Backend sub-gate **RB-004 PASS / LOCKED**:
-- list tenant devices;
-- start device pairing;
-- read QR/status pairing state;
-- set a CONNECTED device as default;
-- select an explicit device per broadcast;
-- persist that device into the meeting H-1 reminder schedule;
-- gateway token remains server-side only.
+Completed:
+- authoritative Flutter source recovered and verified against production;
+- device list/status UI deployed;
+- QR pairing flow deployed;
+- pairing can be resumed with `Tampilkan QR`;
+- default-device action exposed;
+- sender selector added to Undangan & Broadcast;
+- selected device is forwarded as `gatewayDeviceId` and preserved for H-1 reminder routing;
+- gateway token remains server-side only;
+- `jember-main` (`6285702459733`) = CONNECTED;
+- `jember-02` (`6285806700300`) = CONNECTED;
+- controlled send through `jember-02` returned `sent=1 / failed=0`;
+- gateway audit recorded `jember-02` TEXT and DOCUMENT as SENT;
+- UI-018 = PASS / LOCKED;
+- active frontend release: `/var/www/redhub.redvote.id/releases/20261006-010820`;
+- active backend release: `/opt/redhub-hybrid/releases/20261006-003054`.
 
-Production backend release after RB-004:
-`/opt/redhub-hybrid/releases/20261005-234245`.
-
-Remaining WA-011 work is Flutter UI integration and controlled second-device
-pairing/E2E. The Flutter source is not available through the currently connected
-GitHub account or known local project directories, so compiled production
-`main.dart.js` must not be edited as a substitute.
+The organization currently remains in TEST mode and no default device was forced automatically. The operator can choose either CONNECTED device using `Jadikan Default`.
 
 ## 12. Current Position
 
 **WA-008:** PASS / LOCKED — actual RedHub backend recovered and integrated
 **WA-009:** PASS / LOCKED — production gateway deployment
 **WA-010:** PASS / LOCKED — production end-to-end and controlled go-live
-**WA-011:** IN PROGRESS — device management + pairing UI integration
+**WA-011:** PASS / LOCKED — device management + pairing + sender selection complete
 **RB-004:** PASS / LOCKED — production multi-device management API
+**UI-018:** PASS / LOCKED — production multi-device frontend
 **WA GATEWAY V1:** COMPLETE / LIVE
 **PRODUCTION PROVIDER:** REDHUB_GATEWAY
-**BROADCAST MODE:** LIVE
-**TENANT / DEVICE:** jember / jember-main
+**BROADCAST MODE:** TEST (current organization setting)
+**TENANT:** jember
+**DEVICES:** jember-main + jember-02, both CONNECTED
+**DEFAULT DEVICE:** not selected; operator-controlled
 **ROLLBACK:** Fonnte credential retained
-**PRODUCTION:** backend, reminder timer, gateway, PostgreSQL healthy; WhatsApp CONNECTED
+**PRODUCTION:** backend, reminder timer, gateway, PostgreSQL healthy; two WhatsApp devices CONNECTED
 **TARGET VPS:** 202.10.36.74
 
 ## 13. Handoff Rule
@@ -342,7 +346,9 @@ Saat chat baru:
 5. baca Decisions;
 6. baca API Contract;
 7. cek branch/HEAD;
-8. anggap WA-000 sampai WA-010 PASS / LOCKED dan production LIVE kecuali ada regression terverifikasi;
-9. lanjutkan WA-011 dari Flutter UI integration; RB-004 backend sudah PASS / LOCKED;
-10. jangan edit compiled `main.dart.js` untuk menggantikan source Flutter;
-11. jangan mengulang PASS/LOCKED tanpa regression.
+8. anggap WA-000 sampai WA-011 PASS / LOCKED kecuali ada regression terverifikasi;
+9. anggap RB-004 dan UI-018 PASS / LOCKED;
+10. source Flutter authoritative adalah repository `santrinasionalisid-stack/organisasi-attendance`, branch kerja UI-018 tercatat di GitHub;
+11. jangan edit compiled `main.dart.js` untuk menggantikan source Flutter;
+12. future capability harus memakai checkpoint baru;
+13. jangan mengulang PASS/LOCKED tanpa regression.

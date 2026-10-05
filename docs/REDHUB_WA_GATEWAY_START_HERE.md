@@ -120,8 +120,9 @@ VPS lama `202.10.45.147` tidak disentuh kecuali ada instruksi eksplisit.
 - WA-008 — Actual RedHub Backend Integration Validation — PASS / LOCKED
 - WA-009 — Production Deployment — PASS / LOCKED
 - WA-010 — Production End-to-End / Go-Live — PASS / LOCKED
-- WA-011 — RedHub Device Management & Pairing Integration — IN PROGRESS
+- WA-011 — RedHub Device Management & Pairing Integration — PASS / LOCKED
 - RB-004 backend multi-device management API — PASS / LOCKED
+- UI-018 WhatsApp Device Management — PASS / LOCKED
 - WA Gateway V1 — COMPLETE / LIVE
 
 ## Mandatory Workflow
@@ -140,31 +141,27 @@ Tidak boleh mengklaim PASS tanpa verifikasi.
 
 ## Next Action
 
-**WA-011 — RedHub Device Management & Pairing Integration**
-
-Backend RB-004 sudah PASS / LOCKED dan production-ready. Lanjutkan dari Flutter
-UI setelah source RedHub frontend tersedia:
-
-- tampilkan daftar device tenant;
-- tambah device dan mulai pairing;
-- render QR dari backend;
-- polling sampai CONNECTED;
-- set default device;
-- pilih sender pada Undangan & Broadcast;
-- controlled second-device E2E.
+Tidak ada mandatory checkpoint WA-011 yang tersisa. Device management sudah production-ready.
 
 Production saat ini:
 - provider `REDHUB_GATEWAY`;
-- mode `LIVE`;
-- tenant/default device `jember / jember-main`;
-- WhatsApp `CONNECTED`;
-- backend active release `/opt/redhub-hybrid/releases/20261005-234245`;
+- mode organisasi `TEST`;
+- tenant `jember`;
+- `jember-main` = CONNECTED;
+- `jember-02` = CONNECTED;
+- default device belum dipilih dan tetap operator-controlled;
+- sender selector pada Undangan & Broadcast tersedia;
+- QR pairing dan resume pairing tersedia dari RedHub;
+- frontend active release `/var/www/redhub.redvote.id/releases/20261006-010820`;
+- backend active release `/opt/redhub-hybrid/releases/20261006-003054`;
 - backend, reminder timer, gateway dan PostgreSQL healthy;
 - Fonnte credential tetap disimpan sebagai rollback.
 
+Future work harus dibuat sebagai checkpoint baru.
+
 Rules:
 - jangan menyentuh VPS lama `202.10.45.147` tanpa instruksi eksplisit;
-- jangan mengulang WA-000 sampai WA-010 tanpa regression terverifikasi;
+- jangan mengulang WA-000 sampai WA-011 tanpa regression terverifikasi;
 - jangan memindahkan scheduler/broadcast/reminder business logic ke gateway;
 - jangan expose gateway token ke Flutter;
 - jangan edit compiled `main.dart.js` sebagai pengganti source Flutter.

@@ -1,17 +1,17 @@
-# WA Gateway — Next Session PR
+# WA Gateway — Completion Handoff
 
-**Updated:** 2026-10-05
+**Updated:** 2026-10-06
 **Project:** RedHub WA Gateway
-**Current work:** WA-011 — RedHub Device Management & Pairing Integration
-**Status:** IN PROGRESS
+**Current checkpoint:** WA-011 — RedHub Device Management & Pairing Integration
+**Status:** PASS / LOCKED
 
 ## Do Not Repeat
 
-WA-000 through WA-010 are PASS / LOCKED.
+WA-000 through WA-011 are PASS / LOCKED.
 
 Do not:
 - touch old VPS `202.10.45.147`;
-- unpair/logout/delete `jember-main`;
+- unpair/logout/delete production devices without explicit instruction;
 - run `docker compose down -v`;
 - move broadcast/reminder scheduling into the gateway;
 - expose the gateway bearer token to Flutter;
@@ -22,81 +22,52 @@ Do not:
 - VPS: `202.10.36.74`
 - Gateway: `127.0.0.1:3410`
 - Provider: `REDHUB_GATEWAY`
-- Broadcast mode: `LIVE`
-- Tenant/default device: `jember / jember-main`
-- WhatsApp: `CONNECTED`
-- Existing sender: `6285702459733`
+- Current organization broadcast mode: `TEST`
+- Tenant: `jember`
+- `jember-main` / `6285702459733`: CONNECTED
+- `jember-02` / `6285806700300`: CONNECTED
+- Default sender: not selected; operator-controlled in RedHub
 - Fonnte credential: retained for rollback
-- Backend active release: `/opt/redhub-hybrid/releases/20261005-234245`
-- Backend branch: `feat/redhub-wa-device-management`
-- Gateway documentation branch: `feat/redhub-wa-011-device-management`
+- Backend active release: `/opt/redhub-hybrid/releases/20261006-003054`
+- Frontend active release: `/var/www/redhub.redvote.id/releases/20261006-010820`
 
-## RB-004 — Backend Multi-Device Management
+## Locked Components
 
-**PASS / LOCKED**
+- RB-004 — Backend Multi-Device Management API: PASS / LOCKED
+- UI-018 — WhatsApp Device Management: PASS / LOCKED
+- WA-011 — RedHub Device Management & Pairing Integration: PASS / LOCKED
 
-Implemented and deployed:
-- `listWhatsappDevices`;
-- `startWhatsappDevicePairing`;
-- `getWhatsappDevicePairing`;
-- `setDefaultWhatsappDevice`;
-- per-broadcast `gatewayDeviceId`;
-- reminder persistence of selected/default gateway device.
+## WA-011 Final Evidence
 
-Verification:
-- unit tests 11/11 PASS;
-- syntax PASS;
-- production health PASS;
-- Jember device list PASS;
-- `jember-main` CONNECTED;
-- management endpoint authentication gate PASS (anonymous -> 401).
+- Flutter source recovered and verified against production build;
+- device list/status UI deployed;
+- QR pairing available directly from RedHub;
+- existing pairing can be resumed with `Tampilkan QR`;
+- default-device action available;
+- sender selector available on Undangan & Broadcast;
+- second device `jember-02` paired from RedHub and reached CONNECTED;
+- controlled TEXT send through `jember-02`: sent 1 / failed 0;
+- gateway delivery audit records `jember-02` TEXT and DOCUMENT deliveries as SENT;
+- both WhatsApp sessions coexist under tenant `jember`;
+- backend, reminder timer, gateway and PostgreSQL healthy.
 
-Gateway token remains server-side only.
+## Responsibility Boundary
 
-## WA-011 Remaining Work
+RedHub backend remains the business-logic owner:
+- recipient selection;
+- meeting invitation business flow;
+- TEST/LIVE policy;
+- H-1 scheduling;
+- selected/default device decision;
+- business retry decisions.
 
-Flutter RedHub must implement:
+WA Gateway remains delivery-only:
+- persistent WhatsApp sessions;
+- tenant/device isolation;
+- QR pairing/status;
+- text/PDF delivery;
+- minimal delivery audit.
 
-1. **Device list**
-   - call `listWhatsappDevices`;
-   - show phone, deviceId, status and default badge.
+## Next Work
 
-2. **Add number / pairing**
-   - enter a safe device ID;
-   - call `startWhatsappDevicePairing`;
-   - poll `getWhatsappDevicePairing`;
-   - render returned QR;
-   - stop showing QR when status reaches CONNECTED.
-
-3. **Default sender**
-   - enable only for CONNECTED devices;
-   - call `setDefaultWhatsappDevice`.
-
-4. **Broadcast sender selector**
-   - load CONNECTED devices;
-   - default to organization default device;
-   - pass selected `gatewayDeviceId` to `broadcastMeetingInvitation`.
-
-5. **Controlled production E2E**
-   - pair one additional controlled WhatsApp number;
-   - verify both device sessions coexist under tenant `jember`;
-   - send one controlled broadcast using the new device;
-   - verify gateway audit uses that device;
-   - verify H-1 reminder stores/uses the selected/default device;
-   - restart gateway and confirm both devices recover without QR.
-
-## Current Blocker
-
-The Flutter RedHub source is not visible in the currently connected GitHub
-account and was not found in the known local project directories.
-
-Do not modify compiled web output. Resume UI work only from the actual Flutter
-source repository or a verified local clone.
-
-## Resume Rule
-
-When Flutter source becomes available:
-- start directly from WA-011 Flutter UI integration;
-- do not redo gateway pairing/session primitives;
-- do not redo RB-004 backend work unless a regression appears;
-- checkpoint each PASS and push to GitHub.
+No mandatory WA-011 work remains. Any new capability must start a new checkpoint.
