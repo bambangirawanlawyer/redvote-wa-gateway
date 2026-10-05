@@ -120,6 +120,8 @@ VPS lama `202.10.45.147` tidak disentuh kecuali ada instruksi eksplisit.
 - WA-008 — Actual RedHub Backend Integration Validation — PASS / LOCKED
 - WA-009 — Production Deployment — PASS / LOCKED
 - WA-010 — Production End-to-End / Go-Live — PASS / LOCKED
+- WA-011 — RedHub Device Management & Pairing Integration — IN PROGRESS
+- RB-004 backend multi-device management API — PASS / LOCKED
 - WA Gateway V1 — COMPLETE / LIVE
 
 ## Mandatory Workflow
@@ -138,13 +140,25 @@ Tidak boleh mengklaim PASS tanpa verifikasi.
 
 ## Next Action
 
-Tidak ada mandatory V1 checkpoint yang tersisa.
+**WA-011 — RedHub Device Management & Pairing Integration**
+
+Backend RB-004 sudah PASS / LOCKED dan production-ready. Lanjutkan dari Flutter
+UI setelah source RedHub frontend tersedia:
+
+- tampilkan daftar device tenant;
+- tambah device dan mulai pairing;
+- render QR dari backend;
+- polling sampai CONNECTED;
+- set default device;
+- pilih sender pada Undangan & Broadcast;
+- controlled second-device E2E.
 
 Production saat ini:
 - provider `REDHUB_GATEWAY`;
 - mode `LIVE`;
-- tenant/device `jember / jember-main`;
+- tenant/default device `jember / jember-main`;
 - WhatsApp `CONNECTED`;
+- backend active release `/opt/redhub-hybrid/releases/20261005-234245`;
 - backend, reminder timer, gateway dan PostgreSQL healthy;
 - Fonnte credential tetap disimpan sebagai rollback.
 
@@ -152,4 +166,5 @@ Rules:
 - jangan menyentuh VPS lama `202.10.45.147` tanpa instruksi eksplisit;
 - jangan mengulang WA-000 sampai WA-010 tanpa regression terverifikasi;
 - jangan memindahkan scheduler/broadcast/reminder business logic ke gateway;
-- future work wajib dibuat sebagai checkpoint/decision baru.
+- jangan expose gateway token ke Flutter;
+- jangan edit compiled `main.dart.js` sebagai pengganti source Flutter.

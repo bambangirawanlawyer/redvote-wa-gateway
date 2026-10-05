@@ -837,3 +837,83 @@ Histori tidak dihapus; digantikan oleh WA-001A atas instruksi eksplisit user.
 - **TARGET VPS:** `202.10.36.74`
 - **NEXT:** normal operation; future capabilities or architecture changes require a new checkpoint
 - **WORKFLOW:** local first -> verified -> checkpoint -> production
+
+
+---
+
+## WA-011 — RedHub Device Management & Pairing Integration
+
+**Status: IN PROGRESS**
+**Date:** 2026-10-05
+**Branch:** `feat/redhub-wa-011-device-management`
+
+### Locked Scope
+
+Enable RedHub operators to manage WhatsApp sender devices without opening a
+terminal or the VPS:
+
+- list all WhatsApp devices for the active tenant;
+- add/start a new device pairing flow;
+- display QR pairing state;
+- display CONNECTED / CONNECTING / PAIRING / DISCONNECTED / ERROR;
+- select one CONNECTED device as organization default;
+- allow an explicit device to be selected for a meeting broadcast;
+- preserve the selected/default device for that meeting's H-1 reminder.
+
+### Gateway Capability
+
+No gateway business-logic expansion is required.
+
+Existing gateway V1 already provides the required delivery/session primitives:
+- tenant-scoped device list;
+- protected device start/pair endpoint;
+- protected status endpoint;
+- protected pairing QR endpoint;
+- persistent sessions at `SESSION_DIR/<tenantId>/<deviceId>/`;
+- multiple devices per tenant;
+- explicit `deviceId` on text/PDF delivery;
+- cross-tenant isolation.
+
+The gateway remains delivery-only. Default-device choice and sender selection
+remain RedHub backend business configuration.
+
+### Backend Gate
+
+**RB-004 — PASS / LOCKED**
+
+Production backend now exposes:
+- `listWhatsappDevices`;
+- `startWhatsappDevicePairing`;
+- `getWhatsappDevicePairing`;
+- `setDefaultWhatsappDevice`;
+- per-broadcast `gatewayDeviceId` sender override;
+- H-1 reminder persistence of the selected/default device.
+
+Production smoke:
+- tenant `jember` listed successfully;
+- `jember-main` = CONNECTED;
+- sender phone = `6285702459733`;
+- management endpoint remains authenticated (anonymous request -> 401);
+- existing gateway/session remained healthy.
+
+### Remaining Exit Gates
+
+- implement Flutter RedHub device-management UI;
+- render pairing QR from backend response;
+- poll status until CONNECTED;
+- expose default-device action;
+- expose sender selector in Undangan & Broadcast;
+- pair one additional controlled WhatsApp number;
+- send controlled message/PDF through the additional device;
+- verify meeting reminder keeps the selected/default device;
+- responsive frontend verification;
+- GitHub checkpoint and production deployment.
+
+### Current Blocker
+
+The RedHub Flutter source repository is not available in the currently connected
+GitHub account and was not found in the local project directories. Do not edit
+the compiled production `main.dart.js` as a substitute for the source repo.
+
+WA-011 remains **IN PROGRESS** until the Flutter source is available and the UI
+plus controlled multi-device E2E gate passes.

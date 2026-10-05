@@ -294,11 +294,36 @@ Production end-to-end gate completed:
 
 WA Gateway V1 is complete and operational in LIVE mode.
 
+### WA-011 - RedHub Device Management & Pairing Integration
+**IN PROGRESS — 2026-10-05**
+
+Goal: manage multiple WhatsApp sender devices directly from RedHub without
+terminal/VPS access.
+
+Backend sub-gate **RB-004 PASS / LOCKED**:
+- list tenant devices;
+- start device pairing;
+- read QR/status pairing state;
+- set a CONNECTED device as default;
+- select an explicit device per broadcast;
+- persist that device into the meeting H-1 reminder schedule;
+- gateway token remains server-side only.
+
+Production backend release after RB-004:
+`/opt/redhub-hybrid/releases/20261005-234245`.
+
+Remaining WA-011 work is Flutter UI integration and controlled second-device
+pairing/E2E. The Flutter source is not available through the currently connected
+GitHub account or known local project directories, so compiled production
+`main.dart.js` must not be edited as a substitute.
+
 ## 12. Current Position
 
 **WA-008:** PASS / LOCKED — actual RedHub backend recovered and integrated
 **WA-009:** PASS / LOCKED — production gateway deployment
 **WA-010:** PASS / LOCKED — production end-to-end and controlled go-live
+**WA-011:** IN PROGRESS — device management + pairing UI integration
+**RB-004:** PASS / LOCKED — production multi-device management API
 **WA GATEWAY V1:** COMPLETE / LIVE
 **PRODUCTION PROVIDER:** REDHUB_GATEWAY
 **BROADCAST MODE:** LIVE
@@ -318,5 +343,6 @@ Saat chat baru:
 6. baca API Contract;
 7. cek branch/HEAD;
 8. anggap WA-000 sampai WA-010 PASS / LOCKED dan production LIVE kecuali ada regression terverifikasi;
-9. future work harus dibuat sebagai checkpoint/decision baru;
-10. jangan mengulang PASS/LOCKED tanpa regression.
+9. lanjutkan WA-011 dari Flutter UI integration; RB-004 backend sudah PASS / LOCKED;
+10. jangan edit compiled `main.dart.js` untuk menggantikan source Flutter;
+11. jangan mengulang PASS/LOCKED tanpa regression.
