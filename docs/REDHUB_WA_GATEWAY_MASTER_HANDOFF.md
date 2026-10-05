@@ -352,3 +352,19 @@ Saat chat baru:
 11. jangan edit compiled `main.dart.js` untuk menggantikan source Flutter;
 12. future capability harus memakai checkpoint baru;
 13. jangan mengulang PASS/LOCKED tanpa regression.
+
+
+## Post-Lock Integration Rule — UI-019 / RB-005 — 2026-10-06
+
+**LOCKED**
+
+RedHub organization identity is the canonical WA Gateway tenant identity:
+
+- one RedHub organization = one WA Gateway tenant;
+- `organizationId` = `gatewayTenantId`;
+- do not add a separate gateway tenant-creation lifecycle or tenant registry UI;
+- organization creation/mapping is owned by RedHub backend;
+- WA Gateway creates/manages device sessions under the supplied tenant ID only;
+- one organization/tenant may have multiple devices;
+- default sender and per-broadcast sender selection remain organization-scoped;
+- UI-019 and RB-005 are PASS / LOCKED.
