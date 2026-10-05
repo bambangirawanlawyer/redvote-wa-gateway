@@ -331,7 +331,7 @@ The organization currently remains in TEST mode and no default device was forced
 **BROADCAST MODE:** TEST (current organization setting)
 **TENANT:** jember
 **DEVICES:** jember-main + jember-02, both CONNECTED
-**DEFAULT DEVICE:** not selected; operator-controlled
+**DEFAULT DEVICE:** jember-main (`6285702459733`)
 **ROLLBACK:** Fonnte credential retained
 **PRODUCTION:** backend, reminder timer, gateway, PostgreSQL healthy; two WhatsApp devices CONNECTED
 **TARGET VPS:** 202.10.36.74

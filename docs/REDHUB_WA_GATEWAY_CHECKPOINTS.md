@@ -834,7 +834,7 @@ Histori tidak dihapus; digantikan oleh WA-001A atas instruksi eksplisit user.
 - **BROADCAST MODE:** `TEST` (current organization setting; WA-010 historical go-live remains locked)
 - **TENANT:** `jember`
 - **DEVICES:** `jember-main` + `jember-02`
-- **DEFAULT DEVICE:** not selected yet; operator-controlled
+- **DEFAULT DEVICE:** `jember-main` (`6285702459733`)
 - **WHATSAPP:** both devices `CONNECTED`
 - **ROLLBACK:** Fonnte credential retained
 - **TARGET VPS:** `202.10.36.74`

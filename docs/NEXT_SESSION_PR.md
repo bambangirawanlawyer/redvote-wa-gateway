@@ -26,7 +26,7 @@ Do not:
 - Tenant: `jember`
 - `jember-main` / `6285702459733`: CONNECTED
 - `jember-02` / `6285806700300`: CONNECTED
-- Default sender: not selected; operator-controlled in RedHub
+- Default sender: `jember-main` / `6285702459733`
 - Fonnte credential: retained for rollback
 - Backend active release: `/opt/redhub-hybrid/releases/20261006-003054`
 - Frontend active release: `/var/www/redhub.redvote.id/releases/20261006-010820`

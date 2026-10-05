@@ -149,7 +149,7 @@ Production saat ini:
 - tenant `jember`;
 - `jember-main` = CONNECTED;
 - `jember-02` = CONNECTED;
-- default device belum dipilih dan tetap operator-controlled;
+- default device `jember-main` (`6285702459733`);
 - sender selector pada Undangan & Broadcast tersedia;
 - QR pairing dan resume pairing tersedia dari RedHub;
 - frontend active release `/var/www/redhub.redvote.id/releases/20261006-010820`;
