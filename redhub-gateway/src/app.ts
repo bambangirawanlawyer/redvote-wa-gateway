@@ -30,16 +30,44 @@ export type BuildAppOptions = {
 };
 
 const MAX_PDF_BYTES = 10 * 1024 * 1024;
+const MAX_INLINE_DOCUMENT_BYTES = 32 * 1024;
 const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
 
 function isSafeId(value: string | undefined): value is string {
   return Boolean(value && SAFE_ID.test(value));
 }
 
-function sanitizePdfFilename(value: string): string {
+function sanitizeDocumentFilename(
+  value: string,
+  mimeType: 'application/pdf' | 'image/png'
+): string {
   const safe = basename(value.trim()).replace(/[^A-Za-z0-9._ -]/g, '_').slice(0, 120);
   if (!safe || safe === '.' || safe === '..') throw new Error('INVALID_DOCUMENT_FILENAME');
-  return safe.toLowerCase().endsWith('.pdf') ? safe : `${safe}.pdf`;
+  const extension = mimeType === 'image/png' ? '.png' : '.pdf';
+  return safe.toLowerCase().endsWith(extension) ? safe : `${safe}${extension}`;
+}
+
+function decodeInlineDocument(
+  value: string,
+  mimeType: string | undefined
+): { document: Buffer; mimeType: 'image/png' } {
+  if (mimeType !== 'image/png') throw new Error('UNSUPPORTED_DOCUMENT_TYPE');
+  const normalized = value.trim();
+  if (!normalized || !/^[A-Za-z0-9+/]+={0,2}$/.test(normalized)) {
+    throw new Error('INVALID_DOCUMENT_BASE64');
+  }
+  const document = Buffer.from(normalized, 'base64');
+  if (!document.length || document.length > MAX_INLINE_DOCUMENT_BYTES) {
+    throw new Error(document.length > MAX_INLINE_DOCUMENT_BYTES
+      ? 'DOCUMENT_TOO_LARGE'
+      : 'INVALID_DOCUMENT_BASE64');
+  }
+  const pngSignature = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
+  if (document.length < pngSignature.length ||
+      !document.subarray(0, pngSignature.length).equals(pngSignature)) {
+    throw new Error('UNSUPPORTED_DOCUMENT_TYPE');
+  }
+  return { document, mimeType: 'image/png' };
 }
 
 function secureBearerMatches(header: string | undefined, secret: string): boolean {
@@ -419,18 +447,28 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
         deviceId?: string;
         to?: string;
         documentUrl?: string;
+        documentBase64?: string;
+        mimeType?: string;
         filename?: string;
         caption?: string;
         requestId?: string;
       };
 
-      if (!body.tenantId || !body.to || !body.documentUrl || !body.filename) {
+      const hasUrl = Boolean(body.documentUrl?.trim());
+      const hasInline = Boolean(body.documentBase64?.trim());
+      if (
+        !body.tenantId ||
+        !body.to ||
+        !body.filename ||
+        hasUrl === hasInline
+      ) {
         return reply.code(400).send({
           success: false,
           requestId: body.requestId,
           error: {
             code: 'INVALID_REQUEST',
-            message: 'tenantId, to, documentUrl, and filename are required'
+            message:
+              'tenantId, to, filename, and exactly one document source are required'
           }
         });
       }
@@ -478,12 +516,25 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
           if (tenantDevices[0]?.status !== 'CONNECTED') throw new Error('DEVICE_NOT_CONNECTED');
         }
 
-        const document = await fetchPdfWithPolicy(
-          body.documentUrl,
-          documentUrlPolicy,
-          MAX_PDF_BYTES
-        );
-        const filename = sanitizePdfFilename(body.filename);
+        let document: Buffer;
+        let mimeType: 'application/pdf' | 'image/png';
+        if (hasInline) {
+          const inline = decodeInlineDocument(
+            body.documentBase64!,
+            body.mimeType
+          );
+          document = inline.document;
+          mimeType = inline.mimeType;
+        } else {
+          document = await fetchPdfWithPolicy(
+            body.documentUrl!,
+            documentUrlPolicy,
+            MAX_PDF_BYTES
+          );
+          mimeType = 'application/pdf';
+        }
+
+        const filename = sanitizeDocumentFilename(body.filename, mimeType);
         const caption = body.caption?.trim();
         if (caption && caption.length > 1024) throw new Error('INVALID_DOCUMENT_CAPTION');
 
@@ -493,6 +544,7 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
           to: body.to,
           document,
           filename,
+          mimeType,
           caption: caption || undefined
         });
 
@@ -532,10 +584,11 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
                         code === 'INVALID_DOCUMENT_SOURCE' ||
                         code === 'INVALID_DOCUMENT_FILENAME' ||
                         code === 'INVALID_DOCUMENT_CAPTION' ||
+                        code === 'INVALID_DOCUMENT_BASE64' ||
                         code === 'UNSUPPORTED_DOCUMENT_TYPE'
                       ? 400
                       : 502;
-        const safeMessage = 'Unable to send WhatsApp PDF document';
+        const safeMessage = 'Unable to send WhatsApp document';
 
         await recordDeliveryLogSafe({
           requestId,

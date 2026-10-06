@@ -332,3 +332,35 @@ Any breaking API change must:
 3. update Checkpoints;
 4. include a RedHub client migration plan;
 5. never be introduced silently.
+
+## 6A. Inline PNG extension — WA-012
+
+`POST /api/v1/messages/document` remains backward-compatible.
+
+For confidential RedHub-generated QR documents, the caller may send an inline PNG instead of a URL:
+
+```json
+{
+  "tenantId": "jember",
+  "deviceId": "jember-main",
+  "to": "628123456789",
+  "documentBase64": "<base64 PNG>",
+  "mimeType": "image/png",
+  "filename": "QR-RedHub.png",
+  "caption": "QR kehadiran",
+  "requestId": "rh-qr-001"
+}
+```
+
+Rules:
+- exactly one of `documentUrl` or `documentBase64` is required;
+- inline content is restricted to `image/png`;
+- decoded inline PNG maximum is 32 KiB;
+- PNG magic/signature is validated;
+- the global Fastify body limit remains 64 KiB;
+- inline content stays in memory and is passed directly to Baileys;
+- no permanent/public document URL is created for the QR;
+- existing PDF URL behavior, SSRF policy, and 10 MiB PDF limit are unchanged.
+
+Additional error code:
+- `INVALID_DOCUMENT_BASE64`.

@@ -104,7 +104,7 @@ export class BaileysDeviceManager implements WhatsAppDeviceManager {
     try {
       const result = await runtime.socket!.sendMessage(`${to}@s.whatsapp.net`, {
         document: input.document,
-        mimetype: 'application/pdf',
+        mimetype: input.mimeType,
         fileName: input.filename,
         caption: input.caption
       });

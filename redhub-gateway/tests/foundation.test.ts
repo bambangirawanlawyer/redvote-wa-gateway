@@ -508,6 +508,84 @@ test('document delivery fetches PDF in memory and sends filename/caption', async
   }
 });
 
+
+test('document delivery accepts bounded inline PNG without public URL', async () => {
+  const devices = new FakeDeviceManager();
+  devices.connectForTest();
+  const app = buildApp({
+    db: healthyDb(),
+    devices,
+    apiTokenSecret: 'test-secret',
+    documentAllowedHosts: ['example.test'],
+    logger: false
+  });
+  const png = Buffer.from([
+    137, 80, 78, 71, 13, 10, 26, 10,
+    0, 0, 0, 0, 73, 69, 78, 68
+  ]);
+
+  try {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/v1/messages/document',
+      headers: { authorization: 'Bearer test-secret' },
+      payload: {
+        tenantId: 'jember',
+        deviceId: 'jember-main',
+        to: '628123456789',
+        documentBase64: png.toString('base64'),
+        mimeType: 'image/png',
+        filename: 'QR-RedHub',
+        caption: 'QR kehadiran',
+        requestId: 'req-inline-qr'
+      }
+    });
+
+    assert.equal(response.statusCode, 200);
+    assert.equal(response.json().success, true);
+    assert.equal(response.json().filename, 'QR-RedHub.png');
+    assert.equal(devices.lastDocument?.mimeType, 'image/png');
+    assert.equal(devices.lastDocument?.filename, 'QR-RedHub.png');
+    assert.deepEqual(devices.lastDocument?.document, png);
+  } finally {
+    await app.close();
+  }
+});
+
+test('document delivery rejects ambiguous inline and URL sources', async () => {
+  const devices = new FakeDeviceManager();
+  devices.connectForTest();
+  const app = buildApp({
+    db: healthyDb(),
+    devices,
+    apiTokenSecret: 'test-secret',
+    documentAllowedHosts: ['example.test'],
+    logger: false
+  });
+
+  try {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/v1/messages/document',
+      headers: { authorization: 'Bearer test-secret' },
+      payload: {
+        tenantId: 'jember',
+        deviceId: 'jember-main',
+        to: '628123456789',
+        documentUrl: 'https://example.test/undangan.pdf',
+        documentBase64: 'iVBORw0KGgo=',
+        mimeType: 'image/png',
+        filename: 'ambiguous'
+      }
+    });
+
+    assert.equal(response.statusCode, 400);
+    assert.equal(response.json().error.code, 'INVALID_REQUEST');
+  } finally {
+    await app.close();
+  }
+});
+
 test('document delivery rejects invalid source protocol', async () => {
   const devices = new FakeDeviceManager();
   devices.connectForTest();

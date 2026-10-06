@@ -41,6 +41,7 @@ export type SendDocumentInput = {
   to: string;
   document: Buffer;
   filename: string;
+  mimeType: 'application/pdf' | 'image/png';
   caption?: string;
 };
 

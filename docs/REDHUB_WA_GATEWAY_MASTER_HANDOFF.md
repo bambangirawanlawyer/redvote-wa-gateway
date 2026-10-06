@@ -368,3 +368,18 @@ RedHub organization identity is the canonical WA Gateway tenant identity:
 - one organization/tenant may have multiple devices;
 - default sender and per-broadcast sender selection remain organization-scoped;
 - UI-019 and RB-005 are PASS / LOCKED.
+
+## WA-012 — Secure Inline QR Document Extension — 2026-10-07
+
+**PASS / LOCKED at source/local gate; production deploy pending.**
+
+RedHub QR credentials must not be exposed through a permanent public file URL. The gateway document endpoint is therefore extended additively:
+- existing PDF `documentUrl` remains unchanged;
+- confidential QR may use bounded inline `documentBase64` with `mimeType=image/png`;
+- decoded PNG max 32 KiB;
+- Fastify body limit remains 64 KiB;
+- PNG signature required;
+- payload is sent in-memory to Baileys;
+- no public QR file is created.
+
+Local verification: 32/32 tests PASS, typecheck PASS, build PASS.

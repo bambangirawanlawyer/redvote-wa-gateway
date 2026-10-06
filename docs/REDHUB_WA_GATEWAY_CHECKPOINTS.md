@@ -926,3 +926,54 @@ Production smoke:
 **PASS / LOCKED**
 
 WA-011 is complete. Multi-device management, pairing and sender selection are now available from RedHub without terminal/VPS access while the gateway remains a delivery-only layer.
+
+---
+
+## WA-012 — Inline PNG Document Delivery for RedHub QR
+**Status: PASS / LOCKED (source + local gate; production deploy pending)**
+**Date:** 2026-10-07
+**Branch:** `feat/redhub-wa-011-device-management`
+
+### Purpose
+Support secure RedHub QR delivery without exposing the QR credential through a permanent public file URL.
+
+### Backward-compatible API extension
+`POST /api/v1/messages/document` keeps the existing PDF URL contract and now accepts exactly one document source:
+
+1. existing PDF URL:
+   - `documentUrl`
+   - fetched with the existing SSRF/HTTPS/size/type policy;
+   - delivered as `application/pdf`.
+
+2. new inline QR PNG:
+   - `documentBase64`
+   - `mimeType = image/png`
+   - maximum decoded size **32 KiB**;
+   - PNG signature required;
+   - delivered from memory directly to Baileys.
+
+The existing Fastify **64 KiB request body limit remains unchanged**.
+
+### Security
+- bearer auth unchanged;
+- tenant/device ownership unchanged;
+- inline source cannot be combined with `documentUrl`;
+- only `image/png` is accepted for inline delivery;
+- no QR file is written to public storage by the gateway;
+- no raw QR credential is added to delivery logs;
+- PDF URL SSRF protections remain unchanged.
+
+### Verification
+- gateway tests: **32 / 32 PASS**;
+- typecheck: **PASS**;
+- TypeScript build: **PASS**;
+- existing oversized JSON body-limit test remains PASS;
+- existing PDF document delivery tests remain PASS;
+- new inline PNG delivery test PASS;
+- ambiguous URL + inline source rejection PASS.
+
+### Deployment State
+Not deployed to production yet. Existing production gateway behavior remains unchanged until a controlled WA-012 cutover is explicitly performed.
+
+### Rollback
+The extension is additive. Existing RedHub PDF delivery remains on `documentUrl`; rollback is the previous gateway release with no RedHub schema migration required.
