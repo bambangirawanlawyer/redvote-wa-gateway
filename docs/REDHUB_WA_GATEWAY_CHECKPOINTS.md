@@ -977,3 +977,75 @@ Not deployed to production yet. Existing production gateway behavior remains unc
 
 ### Rollback
 The extension is additive. Existing RedHub PDF delivery remains on `documentUrl`; rollback is the previous gateway release with no RedHub schema migration required.
+
+---
+
+## WA-012 Production Deployment — 2026-10-07
+
+**Status: PASS / LOCKED IN PRODUCTION**
+
+Source commit:
+`2dbdb838ba5495ba9cb90dc04669e5ad8b3c0a15`
+
+Production baseline before cutover:
+`4dfbb700a84e712691408bebd08c7603dcd15cbb`
+
+### Controlled deployment evidence
+
+- production backup completed before cutover;
+- session archive:
+  `./backups/redhub-wa-sessions-20261006T205712Z.tgz`;
+- database backup:
+  `./backups/redhub-wa-db-20261006T205712Z.dump`;
+- backup verification: **PASS**;
+- gateway Docker image build: **PASS**;
+- gateway health after cutover: **PASS**;
+- PostgreSQL container: **healthy**;
+- gateway container: **healthy**;
+- production gateway host exposure remains loopback-only on `127.0.0.1:3410`.
+
+### Device/session preservation
+
+Before cutover:
+- device count: 2;
+- CONNECTED: 2;
+- HAS_QR: 0.
+
+After cutover:
+- device count: 2;
+- CONNECTED: 2;
+- HAS_QR: 0;
+- device identity set unchanged;
+- phone binding unchanged;
+- no re-pairing required.
+
+Result:
+**GATEWAY_DEVICE_IDENTITY_CHECK = PASS**
+
+### WA-012 contract smoke
+
+A no-send contract test was executed against the production gateway:
+- request deliberately supplied both `documentUrl` and `documentBase64`;
+- HTTP 400 returned;
+- error code: `INVALID_REQUEST`;
+- no WhatsApp message was sent.
+
+Result:
+**WA012_CONTRACT_SMOKE = PASS**
+
+### Production dependency
+
+RedHub PR004-03 production backend now depends on this WA-012 additive inline PNG document contract for secure Non Pengurus QR delivery.
+
+Existing PDF URL delivery remains backward-compatible.
+
+### Rollback
+
+Rollback baseline remains:
+`4dfbb700a84e712691408bebd08c7603dcd15cbb`
+
+Session/database backups above are retained as recovery evidence.
+
+### Lock
+
+WA-012 is **PASS / LOCKED IN PRODUCTION**.

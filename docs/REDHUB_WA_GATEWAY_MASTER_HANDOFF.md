@@ -383,3 +383,28 @@ RedHub QR credentials must not be exposed through a permanent public file URL. T
 - no public QR file is created.
 
 Local verification: 32/32 tests PASS, typecheck PASS, build PASS.
+
+## Production State — WA-012 — 2026-10-07
+
+WA-012 secure inline PNG document delivery is now **deployed and locked in production**.
+
+Production source:
+`2dbdb838ba5495ba9cb90dc04669e5ad8b3c0a15`
+
+Verified:
+- gateway healthy;
+- PostgreSQL healthy;
+- 2/2 WhatsApp devices CONNECTED;
+- 0 devices require QR pairing;
+- device identities and phone bindings survived container rebuild;
+- inline-PNG contract smoke PASS without sending a WhatsApp message;
+- existing PDF URL contract remains available;
+- rollback baseline and production backups are recorded in `REDHUB_WA_GATEWAY_CHECKPOINTS.md`.
+
+Do not remove or relax:
+- 64 KiB global Fastify body limit;
+- 32 KiB decoded inline PNG limit;
+- PNG signature validation;
+- bearer auth;
+- tenant/device ownership validation;
+- existing PDF SSRF protections.
