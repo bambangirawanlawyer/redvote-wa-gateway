@@ -7,6 +7,7 @@ import makeWASocket, {
   Browsers,
   DisconnectReason,
   useMultiFileAuthState,
+  type AnyMessageContent,
   type WASocket
 } from 'baileys';
 import type {
@@ -40,6 +41,24 @@ export type BaileysDeviceManagerOptions = {
 };
 
 const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
+
+export function buildMediaMessageContent(
+  input: Pick<SendDocumentInput, 'document' | 'filename' | 'mimeType' | 'caption'>
+): AnyMessageContent {
+  if (input.mimeType === 'image/png') {
+    return {
+      image: input.document,
+      caption: input.caption
+    };
+  }
+
+  return {
+    document: input.document,
+    mimetype: input.mimeType,
+    fileName: input.filename,
+    caption: input.caption
+  };
+}
 
 export class BaileysDeviceManager implements WhatsAppDeviceManager {
   private readonly devices = new Map<string, RuntimeDevice>();
@@ -102,12 +121,10 @@ export class BaileysDeviceManager implements WhatsAppDeviceManager {
     const to = this.normalizeDestination(input.to);
 
     try {
-      const result = await runtime.socket!.sendMessage(`${to}@s.whatsapp.net`, {
-        document: input.document,
-        mimetype: input.mimeType,
-        fileName: input.filename,
-        caption: input.caption
-      });
+      const result = await runtime.socket!.sendMessage(
+        `${to}@s.whatsapp.net`,
+        buildMediaMessageContent(input)
+      );
       await this.hardenAuthDir(this.authDir(runtime));
       return {
         tenantId: runtime.tenantId,

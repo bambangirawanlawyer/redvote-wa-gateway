@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { buildApp, type HealthDatabase } from '../src/app.js';
+import { buildMediaMessageContent } from '../src/whatsapp/manager.js';
 import {
   createDocumentUrlPolicy,
   fetchPdfWithPolicy,
@@ -508,6 +509,41 @@ test('document delivery fetches PDF in memory and sends filename/caption', async
   }
 });
 
+
+test('Baileys sends inline PNG QR as image while PDF stays document', () => {
+  const png = Buffer.from([
+    137, 80, 78, 71, 13, 10, 26, 10,
+    0, 0, 0, 0, 73, 69, 78, 68
+  ]);
+  const imageMessage = buildMediaMessageContent({
+    document: png,
+    mimeType: 'image/png',
+    filename: 'QR-RedHub.png',
+    caption: 'QR kehadiran'
+  });
+
+  assert.deepEqual(imageMessage, {
+    image: png,
+    caption: 'QR kehadiran'
+  });
+  assert.equal('document' in imageMessage, false);
+
+  const pdf = Buffer.from('%PDF-1.7');
+  const documentMessage = buildMediaMessageContent({
+    document: pdf,
+    mimeType: 'application/pdf',
+    filename: 'Undangan.pdf',
+    caption: 'Undangan resmi'
+  });
+
+  assert.deepEqual(documentMessage, {
+    document: pdf,
+    mimetype: 'application/pdf',
+    fileName: 'Undangan.pdf',
+    caption: 'Undangan resmi'
+  });
+  assert.equal('image' in documentMessage, false);
+});
 
 test('document delivery accepts bounded inline PNG without public URL', async () => {
   const devices = new FakeDeviceManager();
