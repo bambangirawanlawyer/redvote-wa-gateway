@@ -1122,3 +1122,34 @@ No real WhatsApp message was sent by technical verification.
 
 Technical deployment is PASS.  
 **Do not mark WA-013 PASS / LOCKED until Product Owner receives a fresh QR image and confirms the RedHub attendance scanner reads it successfully.**
+
+## WA-014 — RedHub Branded QR Card Integration
+
+**Status: INTEGRATION TECHNICAL PASS — PRODUCT OWNER VISUAL UAT PENDING**  
+**Date:** 2026-10-07
+
+WA-014 does **not** modify WA Gateway source or its delivery contract.
+
+RedHub backend PR004-03A now renders the existing secure `mbr_` credential inside the locked RedHub member-card visual before calling the existing WA-013 inline PNG delivery path.
+
+Gateway behavior remains locked:
+- `image/png` is sent as a WhatsApp image message;
+- PDF remains a WhatsApp document;
+- inline PNG limit remains 32 KiB;
+- tenant/device isolation unchanged;
+- API authentication unchanged;
+- 2/2 Jember devices remain CONNECTED;
+- device identities unchanged.
+
+RedHub source commit:
+`e9af00140e03e3939a67bced457ffb83d645775f`
+
+RedHub production backend:
+`/opt/redhub-hybrid/releases/20261007-075008`
+
+Active gateway Docker image remains:
+`sha256:fa9453ea1bfe3fa2458a6639b96547bc02ad7d1694442793bdc0f5310a61b7fe`
+
+No gateway rebuild/restart was performed for WA-014, and no real WhatsApp message was sent during technical verification.
+
+Remaining gate: Product Owner confirms one fresh branded Non Pengurus QR received through WhatsApp is visually correct and remains scannable.
