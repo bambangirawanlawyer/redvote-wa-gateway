@@ -1125,7 +1125,7 @@ Technical deployment is PASS.
 
 ## WA-014 — RedHub Branded QR Card Integration
 
-**Status: INTEGRATION TECHNICAL PASS — PRODUCT OWNER VISUAL UAT PENDING**  
+**Status: PASS / LOCKED IN PRODUCTION**  
 **Date:** 2026-10-07
 
 WA-014 does **not** modify WA Gateway source or its delivery contract.
@@ -1152,4 +1152,18 @@ Active gateway Docker image remains:
 
 No gateway rebuild/restart was performed for WA-014, and no real WhatsApp message was sent during technical verification.
 
-Remaining gate: Product Owner confirms one fresh branded Non Pengurus QR received through WhatsApp is visually correct and remains scannable.
+Product Owner UAT: **PASS / LOCKED**.
+
+Confirmed:
+- one fresh branded Non Pengurus QR was received through WhatsApp;
+- visual member-card format was correct;
+- the same branded QR was successfully scanned by the current RedHub browser scanner;
+- attendance check-in succeeded.
+
+Multi-tenant integration remains generic:
+- WA Gateway receives tenant/device routing from RedHub;
+- PNG continues to be delivered as a WhatsApp image;
+- no participant name, member id, or Jember tenant id/name is hard-coded in the gateway;
+- tenant/device isolation remains unchanged.
+
+WA-014 is therefore locked as the production branded QR path for current and future Non Pengurus when the tenant uses the RedHub Gateway delivery provider.
