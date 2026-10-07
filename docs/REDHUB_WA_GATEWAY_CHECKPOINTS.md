@@ -1049,3 +1049,76 @@ Session/database backups above are retained as recovery evidence.
 ### Lock
 
 WA-012 is **PASS / LOCKED IN PRODUCTION**.
+
+## WA-013 — QR PNG as WhatsApp Image Message
+
+**Status: DEPLOYED / TECHNICAL PASS — PRODUCT OWNER SCAN UAT PENDING**  
+**Date:** 2026-10-07  
+**Branch:** `feat/redhub-wa-011-device-management`  
+**Source commit:** `ac23a6ae680398a96b0466885a28610b6538668e`
+
+### UAT defect that opened this checkpoint
+
+A real Non Pengurus QR received through WhatsApp was not detected by the RedHub attendance scanner for a new meeting.
+
+Production read-only audit proved:
+- canonical Non Pengurus member exists and is active;
+- meeting participant snapshot document id equals canonical `memberId`;
+- participant source/unit marker is `NON_PENGURUS`;
+- member QR credential exists and is active;
+- token document points to the same `memberId`;
+- member/token QR versions match;
+- server-generated QR PNG decodes successfully to the same opaque `mbr_` credential;
+- no browser request reached `recordAttendanceCheckIn` during the failed scan attempt.
+
+The failure therefore occurred before backend attendance validation.
+
+### Delivery-layer finding
+
+WA-012 accepted secure inline `image/png`, but the Baileys adapter still sent every payload through WhatsApp's document message shape:
+
+`{ document: ..., mimetype: ... }`
+
+WA-013 preserves the existing internal endpoint/security contract while changing only Baileys presentation:
+- `image/png` -> WhatsApp **image** message;
+- `application/pdf` -> WhatsApp **document** message, unchanged.
+
+No QR token, participant, attendance, PDF, tenant isolation, auth, body-limit, or backend contract was changed.
+
+### Verification
+
+Local:
+- gateway tests: **33 / 33 PASS**;
+- typecheck: **PASS**;
+- TypeScript build: **PASS**.
+
+Production pre-cutover:
+- WA-012 session + PostgreSQL backup created:
+  - `redhub-wa-sessions-20261006T235630Z.tgz`
+  - `redhub-wa-db-20261006T235630Z.dump`;
+- rollback source commit: `2dbdb838ba5495ba9cb90dc04669e5ad8b3c0a15`;
+- rollback Docker image built and retained:
+  `redhub-gateway-gateway:wa012-rollback`
+  (`sha256:c5303de31ff02e47adcd197f06e16b1d9ec252848d7307f7df2b6d28d2503dfc`).
+
+Production WA-013:
+- source checkout: `ac23a6ae680398a96b0466885a28610b6538668e`;
+- active Docker image:
+  `sha256:fa9453ea1bfe3fa2458a6639b96547bc02ad7d1694442793bdc0f5310a61b7fe`;
+- gateway health: PASS;
+- PostgreSQL: healthy;
+- gateway exposure remains loopback-only `127.0.0.1:3410`;
+- device count: 2;
+- `jember-main`: CONNECTED, no pairing QR;
+- `jember-02`: CONNECTED, no pairing QR;
+- device phone identities unchanged;
+- compiled runtime contract:
+  - PNG => keys `image, caption`, no `document`;
+  - PDF => keys `document, mimetype, fileName, caption`, no `image`.
+
+No real WhatsApp message was sent by technical verification.
+
+### Acceptance state
+
+Technical deployment is PASS.  
+**Do not mark WA-013 PASS / LOCKED until Product Owner receives a fresh QR image and confirms the RedHub attendance scanner reads it successfully.**
