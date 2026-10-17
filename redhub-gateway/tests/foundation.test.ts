@@ -1,4 +1,9 @@
 import assert from 'node:assert/strict';
+import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { BaileysDeviceManager } from '../src/whatsapp/manager.js';
+
 import test from 'node:test';
 import { buildApp, type HealthDatabase } from '../src/app.js';
 import { buildMediaMessageContent } from '../src/whatsapp/manager.js';
@@ -1367,5 +1372,131 @@ test('disconnect endpoint requires bearer and exact tenant/device confirmation',
     assert.equal(missing.statusCode, 404);
   } finally {
     await app.close();
+  }
+});
+
+
+type Wa012DiskRuntime = {
+  tenantId: string;
+  deviceId: string;
+  status: 'CONNECTED' | 'DISCONNECTED';
+  phone?: string;
+  qr?: string;
+  socket?: { logout: () => Promise<unknown> };
+  pendingCredsWrite?: Promise<void>;
+  retired?: boolean;
+  retiring?: boolean;
+  lastErrorCode?: string;
+};
+function injectWa012TestDevice(
+  manager: BaileysDeviceManager,
+  runtime: Wa012DiskRuntime
+): void {
+  const state = manager as unknown as { devices: Map<string, Wa012DiskRuntime> };
+  state.devices.set(`${runtime.tenantId}::${runtime.deviceId}`, runtime);
+}
+
+test('WA012-DISK: disconnect removes only selected tenant auth folder, not other tenant', async () => {
+  const folder = await mkdtemp(join(tmpdir(), 'redhub-wa012-tenant-isolated-'));
+  const sessionDir = join(folder, 'sessions');
+  const mainDir = join(sessionDir, 'jember-isolated', 'shared-device');
+  const otherDir = join(sessionDir, 'other-isolated', 'shared-device');
+  const manager = new BaileysDeviceManager({sessionDir});
+  let logoutCalls = 0;
+  try {
+    await mkdir(mainDir, {recursive: true});
+    await mkdir(otherDir, {recursive: true});
+    await writeFile(join(mainDir, 'creds.json'), 'jember-only-test-placeholder');
+    await writeFile(join(otherDir, 'creds.json'), 'other-only-test-placeholder');
+    injectWa012TestDevice(manager, {
+      tenantId: 'jember-isolated', deviceId: 'shared-device',
+      status: 'CONNECTED', phone: '6281111111111', qr: 'private-test-qr',
+      socket: {logout: async () => { logoutCalls++; }}
+    });
+    injectWa012TestDevice(manager, {
+      tenantId: 'other-isolated', deviceId: 'shared-device',
+      status: 'CONNECTED', phone: '6282222222222',
+      socket: {logout: async () => { throw Error('MUST_NOT_LOGOUT_OTHER'); }}
+    });
+    const result = await manager.disconnect({
+      tenantId: 'jember-isolated', deviceId: 'shared-device'
+    });
+    assert.equal(result.status, 'DISCONNECTED');
+    assert.equal(result.lastErrorCode, 'UNLINKED');
+    assert.equal(result.hasQr, false);
+    assert.equal(logoutCalls, 1);
+    await assert.rejects(readFile(join(mainDir, 'creds.json')), /ENOENT/);
+    assert.equal(
+      await readFile(join(otherDir, 'creds.json'), 'utf8'),
+      'other-only-test-placeholder'
+    );
+    assert.equal(manager.status('shared-device', 'other-isolated')?.status, 'CONNECTED');
+    assert.equal(manager.getQr('shared-device', 'jember-isolated'), undefined);
+    await assert.rejects(
+      manager.disconnect({tenantId: 'jember-isolated', deviceId: '../unsafe'}),
+      /INVALID_DEVICEID/
+    );
+  } finally {
+    await rm(folder, {recursive: true, force: true});
+  }
+});
+
+test('WA012-DISK: failed remote logout deletes local auth but reports uncertainty', async () => {
+  const folder = await mkdtemp(join(tmpdir(), 'redhub-wa012-unconfirmed-'));
+  const sessionDir = join(folder, 'sessions');
+  const authDir = join(sessionDir, 'jember-isolated', 'main-device');
+  const manager = new BaileysDeviceManager({sessionDir});
+  try {
+    await mkdir(authDir, {recursive: true});
+    await writeFile(join(authDir, 'creds.json'), 'disposable-test-only');
+    injectWa012TestDevice(manager, {
+      tenantId: 'jember-isolated', deviceId: 'main-device',
+      status: 'CONNECTED',
+      socket: {logout: async () => { throw Error('remote-unreachable'); }}
+    });
+    const result = await manager.disconnect({
+      tenantId: 'jember-isolated', deviceId: 'main-device'
+    });
+    assert.equal(result.status, 'DISCONNECTED');
+    assert.equal(result.lastErrorCode, 'REMOTE_LOGOUT_UNCONFIRMED');
+    await assert.rejects(readFile(join(authDir, 'creds.json')), /ENOENT/);
+  } finally {
+    await rm(folder, {recursive: true, force: true});
+  }
+});
+
+test('WA012-DISK: waits pending credential write before erasing local auth', async () => {
+  const folder = await mkdtemp(join(tmpdir(), 'redhub-wa012-writes-'));
+  const sessionDir = join(folder, 'sessions');
+  const authDir = join(sessionDir, 'jember-isolated', 'main-device');
+  const manager = new BaileysDeviceManager({sessionDir});
+  let complete!: () => void;
+  const pending = new Promise<void>((resolve) => { complete = resolve; });
+  try {
+    await mkdir(authDir, {recursive: true});
+    await writeFile(join(authDir, 'creds.json'), 'disposable-test-only');
+    injectWa012TestDevice(manager, {
+      tenantId: 'jember-isolated', deviceId: 'main-device',
+      status: 'CONNECTED',
+      pendingCredsWrite: pending.then(async () => {
+        await writeFile(join(authDir, 'late-credential.json'), 'test-pending');
+      }),
+      socket: {logout: async () => undefined}
+    });
+    const closing = manager.disconnect({
+      tenantId: 'jember-isolated', deviceId: 'main-device'
+    });
+    await assert.rejects(
+      manager.disconnect({tenantId: 'jember-isolated', deviceId: 'main-device'}),
+      /DEVICE_BUSY/
+    );
+    assert.equal((await readdir(authDir)).includes('creds.json'), true);
+    complete();
+    const result = await closing;
+    assert.equal(result.status, 'DISCONNECTED');
+    await assert.rejects(readdir(authDir), /ENOENT/);
+  } finally {
+    complete?.();
+    await rm(folder, {recursive: true, force: true});
   }
 });
