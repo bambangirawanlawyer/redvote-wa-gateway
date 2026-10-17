@@ -212,7 +212,7 @@ export class BaileysDeviceManager implements WhatsAppDeviceManager {
       await rm(this.authDir(runtime), { recursive: true, force: true });
       runtime.lastErrorCode = revocationUnconfirmed
         ? 'REMOTE_LOGOUT_UNCONFIRMED'
-        : undefined;
+        : 'UNLINKED';
       return this.snapshot(runtime);
     } finally {
       runtime.retiring = false;
