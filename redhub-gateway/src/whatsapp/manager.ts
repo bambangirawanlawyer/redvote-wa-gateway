@@ -1,5 +1,5 @@
 import type { Dirent } from 'node:fs';
-import { access, chmod, mkdir, readdir, rename } from 'node:fs/promises';
+import { access, chmod, mkdir, readdir, rename, rm } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { Boom } from '@hapi/boom';
 import pino from 'pino';
@@ -31,6 +31,9 @@ type RuntimeDevice = {
   lastConnectedAt?: string;
   lastErrorCode?: string;
   reconnectTimer?: NodeJS.Timeout;
+  retiring?: boolean;
+  retired?: boolean;
+  pendingCredsWrite?: Promise<void>;
 };
 
 export type BaileysDeviceManagerOptions = {
@@ -143,6 +146,7 @@ export class BaileysDeviceManager implements WhatsAppDeviceManager {
 
     const key = this.deviceKey(input.tenantId, input.deviceId);
     const existing = this.devices.get(key);
+    if (existing?.retiring) throw new Error('DEVICE_BUSY');
     if (
       existing &&
       (existing.status === 'CONNECTING' ||
@@ -167,9 +171,52 @@ export class BaileysDeviceManager implements WhatsAppDeviceManager {
       throw new Error('DEVICE_TENANT_MISMATCH');
     }
 
+    runtime.retired = false;
     this.devices.set(key, runtime);
     await this.connect(runtime);
     return this.snapshot(runtime);
+  }
+
+  async disconnect(input: StartDeviceInput): Promise<DeviceSnapshot> {
+    this.validateId(input.deviceId, 'deviceId');
+    this.validateId(input.tenantId, 'tenantId');
+    const runtime = this.devices.get(this.deviceKey(input.tenantId, input.deviceId));
+    if (!runtime) {
+      const otherTenant = [...this.devices.values()].some(
+        (candidate) => candidate.deviceId === input.deviceId &&
+          candidate.tenantId !== input.tenantId
+      );
+      throw new Error(otherTenant ? 'DEVICE_TENANT_MISMATCH' : 'DEVICE_NOT_FOUND');
+    }
+    if (runtime.retiring) throw new Error('DEVICE_BUSY');
+    runtime.retiring = true;
+    runtime.retired = true;
+    if (runtime.reconnectTimer) clearTimeout(runtime.reconnectTimer);
+    runtime.reconnectTimer = undefined;
+    const socket = runtime.socket;
+    runtime.socket = undefined;
+    runtime.qr = undefined;
+    runtime.status = 'DISCONNECTED';
+    runtime.phone = undefined;
+    let revocationUnconfirmed = false;
+    try {
+      if (socket) {
+        try {
+          await socket.logout();
+        } catch {
+          revocationUnconfirmed = true;
+        }
+      }
+      await runtime.pendingCredsWrite?.catch(() => undefined);
+      // A removed tenant-scoped session cannot silently reconnect on restart.
+      await rm(this.authDir(runtime), { recursive: true, force: true });
+      runtime.lastErrorCode = revocationUnconfirmed
+        ? 'REMOTE_LOGOUT_UNCONFIRMED'
+        : undefined;
+      return this.snapshot(runtime);
+    } finally {
+      runtime.retiring = false;
+    }
   }
 
   async restorePersistedSessions(): Promise<DeviceSnapshot[]> {
@@ -233,6 +280,7 @@ export class BaileysDeviceManager implements WhatsAppDeviceManager {
       await this.hardenAuthDir(authDir);
 
       const { state, saveCreds } = await useMultiFileAuthState(authDir);
+      if (runtime.retired) return;
 
       const socket = makeWASocket({
         auth: state,
@@ -246,13 +294,17 @@ export class BaileysDeviceManager implements WhatsAppDeviceManager {
       runtime.socket = socket;
 
       socket.ev.on('creds.update', () => {
-        void (async () => {
-          await saveCreds();
-          await this.hardenAuthDir(authDir);
-        })().catch(() => undefined);
+        if (runtime.retired) return;
+        runtime.pendingCredsWrite = (runtime.pendingCredsWrite ?? Promise.resolve())
+          .then(async () => {
+            if (runtime.retired) return;
+            await saveCreds();
+            if (!runtime.retired) await this.hardenAuthDir(authDir);
+          }).catch(() => undefined);
       });
 
       socket.ev.on('connection.update', (update) => {
+        if (runtime.retired) return;
         if (update.qr) {
           runtime.qr = update.qr;
           runtime.status = 'PAIRING';
@@ -293,18 +345,18 @@ export class BaileysDeviceManager implements WhatsAppDeviceManager {
       runtime.status = 'ERROR';
       runtime.lastErrorCode = 'CONNECT_FAILED';
 
-      if (!this.shuttingDown) {
+      if (!this.shuttingDown && !runtime.retired) {
         this.scheduleReconnect(runtime);
       }
     }
   }
 
   private scheduleReconnect(runtime: RuntimeDevice): void {
-    if (runtime.reconnectTimer || this.shuttingDown) return;
+    if (runtime.reconnectTimer || this.shuttingDown || runtime.retired) return;
 
     runtime.reconnectTimer = setTimeout(() => {
       runtime.reconnectTimer = undefined;
-      if (!this.shuttingDown) {
+      if (!this.shuttingDown && !runtime.retired) {
         void this.connect(runtime);
       }
     }, this.reconnectDelayMs);
