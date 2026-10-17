@@ -6,6 +6,7 @@ on:
       - feat/wa012-tenant-device-disconnect-repair-20261017
     paths:
       - redhub-gateway/docker-compose.wa012-uat.yml
+      - redhub-gateway/Dockerfile
       - redhub-gateway/docs/WA012_MANUAL_ISOLATED_UAT_2026-10-17.md
       - .github/workflows/wa012-manual-uat-compose-smoke.yml
   workflow_dispatch:
@@ -38,6 +39,20 @@ jobs:
             -f docker-compose.wa012-uat.yml config | grep -F '13410'
           ! docker compose -p redhub_wa012_manual --env-file .env.wa012-uat \
             -f docker-compose.wa012-uat.yml config | grep -F '/var/run/docker.sock'
+      - name: Reproduce restrictive host SQL file mode
+        run: |
+          set -euo pipefail
+          chmod 600 migrations/*.sql
+          test "$(stat -c %a migrations/001_foundation.sql)" = 600
+      - name: Verify SQL is readable inside production image as unprivileged user
+        run: |
+          set -euo pipefail
+          docker compose -p redhub_wa012_manual --env-file .env.wa012-uat \
+            -f docker-compose.wa012-uat.yml build gateway
+          docker compose -p redhub_wa012_manual --env-file .env.wa012-uat \
+            -f docker-compose.wa012-uat.yml run --rm --no-deps --entrypoint sh \
+            gateway -c 'test "$(id -un)" = app && test -r /app/migrations/001_foundation.sql && test -x /app/migrations'
+          echo 'WA012_MIGRATIONS_NONROOT_READABLE=PASS'
       - name: Launch separate disposable stack with AUTO_START false
         run: |
           set -euo pipefail
