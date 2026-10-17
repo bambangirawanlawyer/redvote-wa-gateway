@@ -198,7 +198,9 @@ export class BaileysDeviceManager implements WhatsAppDeviceManager {
     runtime.qr = undefined;
     runtime.status = 'DISCONNECTED';
     runtime.phone = undefined;
-    let revocationUnconfirmed = false;
+    // An absent socket cannot perform a remote WhatsApp logout. Local auth
+    // deletion is still safe, but Linked Devices revocation remains uncertain.
+    let revocationUnconfirmed = !socket;
     try {
       if (socket) {
         try {
