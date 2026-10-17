@@ -1500,3 +1500,27 @@ test('WA012-DISK: waits pending credential write before erasing local auth', asy
     await rm(folder, {recursive: true, force: true});
   }
 });
+
+test('WA012-DISK: no active socket cannot confirm remote unlink', async () => {
+  const folder = await mkdtemp(join(tmpdir(), 'redhub-wa012-nosocket-'));
+  const authDir = join(folder, 'sessions', 'jember-isolated', 'main-device');
+  const manager = new BaileysDeviceManager({sessionDir: join(folder, 'sessions')});
+  try {
+    await mkdir(authDir, {recursive: true});
+    await writeFile(join(authDir, 'creds.json'), 'never-a-real-credential');
+    injectWa012TestDevice(manager, {
+      tenantId: 'jember-isolated',
+      deviceId: 'main-device',
+      status: 'DISCONNECTED'
+      // Intentional: no socket, so remote Linked Devices state is unknown.
+    });
+    const result = await manager.disconnect({
+      tenantId: 'jember-isolated', deviceId: 'main-device'
+    });
+    assert.equal(result.status, 'DISCONNECTED');
+    assert.equal(result.lastErrorCode, 'REMOTE_LOGOUT_UNCONFIRMED');
+    await assert.rejects(readFile(join(authDir, 'creds.json')), /ENOENT/);
+  } finally {
+    await rm(folder, {recursive: true, force: true});
+  }
+});
