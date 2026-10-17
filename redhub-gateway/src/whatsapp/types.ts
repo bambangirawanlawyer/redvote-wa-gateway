@@ -54,6 +54,7 @@ export type SendDocumentResult = {
 
 export interface WhatsAppDeviceManager {
   start(input: StartDeviceInput): Promise<DeviceSnapshot>;
+  disconnect(input: StartDeviceInput): Promise<DeviceSnapshot>;
   restorePersistedSessions(): Promise<DeviceSnapshot[]>;
   list(tenantId?: string): DeviceSnapshot[];
   status(deviceId: string, tenantId?: string): DeviceSnapshot | undefined;

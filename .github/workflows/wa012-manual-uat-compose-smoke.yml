@@ -1,0 +1,91 @@
+name: WA012 Manual Isolated Docker Compose Smoke (NO WA PAIR)
+
+on:
+  push:
+    branches:
+      - feat/wa012-tenant-device-disconnect-repair-20261017
+    paths:
+      - redhub-gateway/docker-compose.wa012-uat.yml
+      - redhub-gateway/Dockerfile
+      - redhub-gateway/docs/WA012_MANUAL_ISOLATED_UAT_2026-10-17.md
+      - .github/workflows/wa012-manual-uat-compose-smoke.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  isolated-compose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: redhub-gateway
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create disposable test credentials, never production
+        run: |
+          set -euo pipefail
+          umask 077
+          printf 'POSTGRES_PASSWORD=%s\nAPI_TOKEN_SECRET=%s\n' \
+            "$(openssl rand -hex 24)" "$(openssl rand -hex 32)" > .env.wa012-uat
+          test "$(stat -c %a .env.wa012-uat)" = 600
+      - name: Validate isolated compose, reject default public/production port
+        run: |
+          set -euo pipefail
+          docker compose -p redhub_wa012_manual --env-file .env.wa012-uat \
+            -f docker-compose.wa012-uat.yml config --quiet
+          docker compose -p redhub_wa012_manual --env-file .env.wa012-uat \
+            -f docker-compose.wa012-uat.yml config | grep -F '13410'
+          ! docker compose -p redhub_wa012_manual --env-file .env.wa012-uat \
+            -f docker-compose.wa012-uat.yml config | grep -F '/var/run/docker.sock'
+      - name: Reproduce restrictive host SQL file mode
+        run: |
+          set -euo pipefail
+          chmod 600 migrations/*.sql
+          test "$(stat -c %a migrations/001_foundation.sql)" = 600
+      - name: Verify SQL is readable inside production image as unprivileged user
+        run: |
+          set -euo pipefail
+          docker compose -p redhub_wa012_manual --env-file .env.wa012-uat \
+            -f docker-compose.wa012-uat.yml build gateway
+          docker compose -p redhub_wa012_manual --env-file .env.wa012-uat \
+            -f docker-compose.wa012-uat.yml run --rm --no-deps --entrypoint sh \
+            gateway -c 'test "$(id -un)" = app && test -r /app/migrations/001_foundation.sql && test -x /app/migrations'
+          echo 'WA012_MIGRATIONS_NONROOT_READABLE=PASS'
+      - name: Launch separate disposable stack with AUTO_START false
+        run: |
+          set -euo pipefail
+          docker compose -p redhub_wa012_manual --env-file .env.wa012-uat \
+            -f docker-compose.wa012-uat.yml up -d --build
+          for i in $(seq 1 40); do
+            if curl -fsS http://127.0.0.1:13410/health >/tmp/wa012-manual-health.json; then break; fi
+            sleep 2
+          done
+          python3 - <<'PY'
+          import json
+          obj = json.load(open('/tmp/wa012-manual-health.json'))
+          assert obj['status'] == 'ok', obj
+          assert obj['database'] == 'ok', obj
+          assert obj['service'] == 'redhub-wa-gateway', obj
+          print('WA012_MANUAL_ISOLATED_HEALTH=PASS')
+          PY
+      - name: Verify empty isolated test devices, no WhatsApp pairing
+        run: |
+          set -euo pipefail
+          set -a; . ./.env.wa012-uat; set +a
+          curl -fsS -H "Authorization: Bearer ${API_TOKEN_SECRET}" \
+            'http://127.0.0.1:13410/api/v1/devices?tenantId=wa012_uat_only' \
+            > /tmp/wa012-manual-devices.json
+          python3 - <<'PY'
+          import json
+          obj = json.load(open('/tmp/wa012-manual-devices.json'))
+          assert obj['tenantId'] == 'wa012_uat_only', obj
+          assert obj['devices'] == [], obj
+          print('WA012_MANUAL_ISOLATED_EMPTY_DEVICES=PASS')
+          PY
+      - name: Delete only disposable CI stack, never other Compose projects
+        if: always()
+        run: |
+          docker compose -p redhub_wa012_manual --env-file .env.wa012-uat \
+            -f docker-compose.wa012-uat.yml down -v --remove-orphans || true

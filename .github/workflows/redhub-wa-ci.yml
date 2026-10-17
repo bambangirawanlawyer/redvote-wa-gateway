@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - "feat/redhub-wa-*"
+      - "feat/wa012-*"
     paths:
       - "redhub-gateway/**"
       - ".github/workflows/redhub-wa-ci.yml"
@@ -33,6 +34,12 @@ jobs:
 
   compose-smoke:
     runs-on: ubuntu-latest
+    env:
+      POSTGRES_PASSWORD: ci-only-local-postgres-2026
+      API_TOKEN_SECRET: ci-only-local-token-not-for-production
+      DEFAULT_TENANT_ID: ci-demo
+      DEFAULT_DEVICE_ID: ci-device
+      AUTO_START_WHATSAPP: 'false'
     defaults:
       run:
         working-directory: redhub-gateway
@@ -68,3 +75,25 @@ jobs:
       - name: Cleanup
         if: always()
         run: docker compose down -v
+
+# OWNER_RELEASE_REVERIFY_2026-10-17_NO_PRODUCTION_DEPLOY
+
+  source-bundle:
+    needs: [node-checks, compose-smoke]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Package pinned Gateway source without secrets (NO DEPLOY)
+        run: |
+          tar -czf wa012-gateway-source.tar.gz \
+            --exclude='*/node_modules' \
+            --exclude='*/.env' \
+            --exclude='*/.env.*' \
+            --exclude='*/data' \
+            redhub-gateway
+          sha256sum wa012-gateway-source.tar.gz
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wa012-gateway-source-no-secrets
+          path: wa012-gateway-source.tar.gz
+          retention-days: 7
