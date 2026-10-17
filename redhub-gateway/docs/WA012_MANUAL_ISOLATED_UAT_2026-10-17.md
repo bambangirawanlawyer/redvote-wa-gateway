@@ -38,6 +38,22 @@ docker compose -p redhub_wa012_manual --env-file .env.wa012-uat \
 
 Before Gate 2, explicitly verify account is test-only and nobody uses it in LIVE.
 
+## Gate 1A — fix EACCES migrations on initial test startup
+
+If `curl /health` returns `curl: (56) Recv failure: Connection reset by peer` and the isolated Gateway logs show `EACCES: permission denied, open '/app/migrations/001_foundation.sql'`, the build image copied SQL as root but the service runs as unprivileged `app`. **This is an image packaging problem, not a PostgreSQL password problem.** Dockerfile was corrected on the WA012 branch to give ownership and restricted `0600` SQL permissions to the app user. No database reset is required.
+
+After the fix is verified in GitHub CI, on the **same isolated test clone** (directory `redvote-wa-gateway/redhub-gateway`), run:
+
+```bash
+git pull --ff-only origin feat/wa012-tenant-device-disconnect-repair-20261017
+docker compose -p redhub_wa012_manual --env-file .env.wa012-uat \
+  -f docker-compose.wa012-uat.yml up -d --build --no-deps gateway
+curl -fsS --retry 10 --retry-all-errors --retry-delay 2 \
+  http://127.0.0.1:13410/health
+```
+
+This recreates **only** the isolated Gateway container using its fixed image; keeps separate Postgres and WhatsApp session volumes and local `.env.wa012-uat`; does **not** issue `down -v` or restart production. Do not use `chmod -R 777`, `sudo` to run the Gateway as root, or `docker compose down -v`. If failure persists, read only the isolated Gateway logs again. This does not perform WhatsApp pairing.
+
 ## Gate 2 — manual real-device pair / disconnect / re-pair
 
 **Only after non-production WhatsApp account is confirmed.** Stay in `redhub-gateway`. Load only new test credentials into current terminal (do not paste them into chat):
