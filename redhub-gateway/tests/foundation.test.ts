@@ -51,6 +51,21 @@ class FakeDeviceManager implements WhatsAppDeviceManager {
     return snapshot;
   }
 
+  async disconnect(input: StartDeviceInput): Promise<DeviceSnapshot> {
+    const key = this.key(input.tenantId, input.deviceId);
+    const found = this.devices.get(key);
+    if (!found) {
+      if (this.list().some((d) => d.deviceId === input.deviceId)) {
+        throw new Error('DEVICE_TENANT_MISMATCH');
+      }
+      throw new Error('DEVICE_NOT_FOUND');
+    }
+    const disconnected = { ...found, status: 'DISCONNECTED' as const, hasQr: false };
+    this.devices.set(key, disconnected);
+    this.qrs.delete(key);
+    return disconnected;
+  }
+
   async restorePersistedSessions(): Promise<DeviceSnapshot[]> {
     return this.list();
   }
@@ -1298,6 +1313,58 @@ test('Fastify body limit rejects oversized JSON payload', async () => {
     });
 
     assert.equal(response.statusCode, 413);
+  } finally {
+    await app.close();
+  }
+});
+
+
+test('disconnect endpoint requires bearer and exact tenant/device confirmation', async () => {
+  const devices = new FakeDeviceManager();
+  devices.connectForTest('jember', 'main');
+  devices.connectForTest('banyuwangi', 'other');
+  const app = buildApp({
+    db: healthyDb(),
+    devices,
+    apiTokenSecret: 'test-secret',
+    logger: false
+  });
+  try {
+    const endpoint = '/api/v1/devices/main/disconnect';
+    const noAuth = await app.inject({
+      method: 'POST', url: endpoint,
+      payload: { tenantId: 'jember', confirmation: 'DISCONNECT_main' }
+    });
+    assert.equal(noAuth.statusCode, 401);
+    const badConfirmation = await app.inject({
+      method: 'POST', url: endpoint,
+      headers: { authorization: 'Bearer test-secret' },
+      payload: { tenantId: 'jember', confirmation: 'bad' }
+    });
+    assert.equal(badConfirmation.statusCode, 400);
+    assert.equal(devices.status('main', 'jember')?.status, 'CONNECTED');
+    const crossTenant = await app.inject({
+      method: 'POST', url: endpoint,
+      headers: { authorization: 'Bearer test-secret' },
+      payload: { tenantId: 'banyuwangi', confirmation: 'DISCONNECT_main' }
+    });
+    assert.equal(crossTenant.statusCode, 403);
+    assert.equal(devices.status('main', 'jember')?.status, 'CONNECTED');
+    const ok = await app.inject({
+      method: 'POST', url: endpoint,
+      headers: { authorization: 'Bearer test-secret' },
+      payload: { tenantId: 'jember', confirmation: 'DISCONNECT_main' }
+    });
+    assert.equal(ok.statusCode, 200);
+    assert.equal(ok.json().status, 'DISCONNECTED');
+    assert.equal(devices.status('main', 'jember')?.status, 'DISCONNECTED');
+    assert.equal(devices.status('other', 'banyuwangi')?.status, 'CONNECTED');
+    const missing = await app.inject({
+      method: 'POST', url: '/api/v1/devices/missing/disconnect',
+      headers: { authorization: 'Bearer test-secret' },
+      payload: { tenantId: 'jember', confirmation: 'DISCONNECT_missing' }
+    });
+    assert.equal(missing.statusCode, 404);
   } finally {
     await app.close();
   }
