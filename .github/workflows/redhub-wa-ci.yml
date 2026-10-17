@@ -77,3 +77,23 @@ jobs:
         run: docker compose down -v
 
 # OWNER_RELEASE_REVERIFY_2026-10-17_NO_PRODUCTION_DEPLOY
+
+  source-bundle:
+    needs: [node-checks, compose-smoke]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Package pinned Gateway source without secrets (NO DEPLOY)
+        run: |
+          tar -czf wa012-gateway-source.tar.gz \
+            --exclude='*/node_modules' \
+            --exclude='*/.env' \
+            --exclude='*/.env.*' \
+            --exclude='*/data' \
+            redhub-gateway
+          sha256sum wa012-gateway-source.tar.gz
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wa012-gateway-source-no-secrets
+          path: wa012-gateway-source.tar.gz
+          retention-days: 7
