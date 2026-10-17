@@ -186,6 +186,50 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
     }
   );
 
+  app.post(
+    '/api/v1/devices/:deviceId/disconnect',
+    { preHandler: requireInternalAuth },
+    async (request, reply) => {
+      const { deviceId } = request.params as { deviceId: string };
+      const body = (request.body ?? {}) as {
+        tenantId?: string;
+        confirmation?: string;
+      };
+      if (!isSafeId(body.tenantId) || !isSafeId(deviceId) ||
+          body.confirmation !== `DISCONNECT_${deviceId}`) {
+        return reply.code(400).send({
+          error: {
+            code: 'INVALID_DISCONNECT_CONFIRMATION',
+            message: 'Valid tenant, device, and explicit confirmation required'
+          }
+        });
+      }
+      try {
+        const device = await options.devices.disconnect({
+          tenantId: body.tenantId,
+          deviceId
+        });
+        app.log.info({ tenantId: body.tenantId, deviceId, status: device.status },
+          'tenant WhatsApp session disconnected');
+        return reply.code(200).send({
+          ok: true,
+          tenantId: device.tenantId,
+          deviceId: device.deviceId,
+          status: device.status,
+          remoteLogoutUnconfirmed: device.lastErrorCode === 'REMOTE_LOGOUT_UNCONFIRMED'
+        });
+      } catch (error) {
+        const code = error instanceof Error ? error.message : 'DEVICE_DISCONNECT_FAILED';
+        const status = code === 'DEVICE_TENANT_MISMATCH' ? 403
+          : code === 'DEVICE_NOT_FOUND' ? 404
+          : code === 'DEVICE_BUSY' ? 409 : 503;
+        return reply.code(status).send({
+          error: { code, message: 'Unable to disconnect WhatsApp device' }
+        });
+      }
+    }
+  );
+
   app.get(
     '/api/v1/devices',
     { preHandler: requireInternalAuth },
