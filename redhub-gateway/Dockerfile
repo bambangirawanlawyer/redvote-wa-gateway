@@ -24,7 +24,10 @@ COPY migrations ./migrations
 RUN addgroup -S app \
     && adduser -S -G app app \
     && mkdir -p /app/data/whatsapp-sessions \
-    && chown app:app /app/data/whatsapp-sessions
+    && chown app:app /app/data/whatsapp-sessions \
+    && chown -R app:app /app/migrations \
+    && find /app/migrations -type d -exec chmod 700 {} + \
+    && find /app/migrations -type f -name '*.sql' -exec chmod 600 {} +
 
 USER app
 
