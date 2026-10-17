@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - "feat/redhub-wa-*"
+      - "feat/wa012-*"
     paths:
       - "redhub-gateway/**"
       - ".github/workflows/redhub-wa-ci.yml"
