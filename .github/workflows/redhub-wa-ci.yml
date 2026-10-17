@@ -34,6 +34,12 @@ jobs:
 
   compose-smoke:
     runs-on: ubuntu-latest
+    env:
+      POSTGRES_PASSWORD: ci-only-local-postgres-2026
+      API_TOKEN_SECRET: ci-only-local-token-not-for-production
+      DEFAULT_TENANT_ID: ci-demo
+      DEFAULT_DEVICE_ID: ci-device
+      AUTO_START_WHATSAPP: 'false'
     defaults:
       run:
         working-directory: redhub-gateway
