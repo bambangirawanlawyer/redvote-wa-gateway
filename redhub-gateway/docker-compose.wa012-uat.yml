@@ -1,0 +1,50 @@
+# WA012 isolated MANUAL UAT, NEVER production. Use only on a separate test VPS/PC.
+# Start with: docker compose -p redhub_wa012_manual --env-file .env.wa012-uat \
+#   -f docker-compose.wa012-uat.yml up -d --build
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: redhub_wa012_uat
+      POSTGRES_USER: wa012_uat_app
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Create separate UAT password}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wa012_uat_app -d redhub_wa012_uat"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - wa012_pgdata:/var/lib/postgresql/data
+  gateway:
+    build:
+      context: .
+      target: production
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: 3410
+      DATABASE_URL: postgresql://wa012_uat_app:${POSTGRES_PASSWORD:?required}@db:5432/redhub_wa012_uat
+      API_TOKEN_SECRET: ${API_TOKEN_SECRET:?Create separate UAT token}
+      DOCUMENT_ALLOWED_HOSTS: ""
+      SESSION_DIR: /app/data/whatsapp-sessions
+      DEFAULT_TENANT_ID: wa012_uat_only
+      DEFAULT_DEVICE_ID: wa012_uat_01
+      AUTO_START_WHATSAPP: "false"
+      LOG_LEVEL: info
+      SERVICE_VERSION: wa012-manual-uat
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:13410:3410"
+    volumes:
+      - wa012_sessions:/app/data/whatsapp-sessions
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3410/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+volumes:
+  wa012_pgdata:
+  wa012_sessions:
